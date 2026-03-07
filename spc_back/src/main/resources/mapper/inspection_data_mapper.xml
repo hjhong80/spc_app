@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.spc.spc_back.mapper.InspectionDataMapper">
+    <resultMap id="inspectionDataResultMap" type="com.spc.spc_back.entity.spcdata.InspectionData">
+        <id property="inspDataId" column="insp_data_id" />
+        <result property="inspReportId" column="insp_report_id" />
+        <result property="charId" column="char_id" />
+        <result property="measuredValue" column="measured_value" />
+        <association property="characteristic" resultMap="inspectionDataCharacteristicResultMap" />
+    </resultMap>
+
+    <resultMap id="inspectionDataCharacteristicResultMap" type="com.spc.spc_back.entity.spcdata.Characteristic">
+        <id property="charId" column="ct_char_id" />
+        <result property="projId" column="ct_proj_id" />
+        <result property="charNo" column="ct_char_no" />
+        <result property="axis" column="ct_axis" />
+        <result property="nominal" column="ct_nominal" />
+        <result property="uTol" column="ct_u_tol" />
+        <result property="lTol" column="ct_l_tol" />
+        <result property="createDt" column="ct_create_dt" />
+        <result property="updateDt" column="ct_update_dt" />
+    </resultMap>
+
+    <insert id="insertInspectionData" useGeneratedKeys="true" keyProperty="inspDataId">
+        INSERT INTO
+            insp_data_tb
+            (insp_report_id, char_id, measured_value)
+        VALUES
+            (#{inspReportId}, #{charId}, #{measuredValue})
+    </insert>
+
+    <select id="selectInspectionDataListByInspReportId" resultMap="inspectionDataResultMap">
+        SELECT
+            idt.insp_data_id,
+            idt.insp_report_id,
+            idt.char_id,
+            idt.measured_value,
+            ct.char_id as ct_char_id,
+            ct.proj_id as ct_proj_id,
+            ct.char_no as ct_char_no,
+            ct.axis as ct_axis,
+            ct.nominal as ct_nominal,
+            ct.u_tol as ct_u_tol,
+            ct.l_tol as ct_l_tol,
+            ct.create_dt as ct_create_dt,
+            ct.update_dt as ct_update_dt
+        FROM
+            insp_data_tb idt
+            LEFT JOIN char_tb ct ON idt.char_id = ct.char_id
+        WHERE
+            idt.insp_report_id = #{inspReportId}
+        ORDER BY
+            idt.insp_data_id
+    </select>
+
+    <select id="selectInspectionDataListByCharId" resultMap="inspectionDataResultMap">
+        SELECT
+            idt.insp_data_id,
+            idt.insp_report_id,
+            idt.char_id,
+            idt.measured_value,
+            ct.char_id as ct_char_id,
+            ct.proj_id as ct_proj_id,
+            ct.char_no as ct_char_no,
+            ct.axis as ct_axis,
+            ct.nominal as ct_nominal,
+            ct.u_tol as ct_u_tol,
+            ct.l_tol as ct_l_tol,
+            ct.create_dt as ct_create_dt,
+            ct.update_dt as ct_update_dt
+        FROM
+            insp_data_tb idt
+            LEFT JOIN char_tb ct ON idt.char_id = ct.char_id
+        WHERE
+            idt.char_id = #{charId}
+        ORDER BY
+            idt.insp_data_id
+    </select>
+
+    <select id="selectDistributionMetaByProjIdAndCharId" resultType="com.spc.spc_back.dto.spcdata.ChartDistributionSourceDto">
+        SELECT
+            ct.char_id as charId,
+            ct.char_no as charNo,
+            ct.axis as axis,
+            ct.nominal as nominal,
+            ct.u_tol as uTol,
+            ct.l_tol as lTol
+        FROM
+            char_tb ct
+        WHERE
+            ct.proj_id = #{projId}
+            AND
+            ct.char_id = #{charId}
+    </select>
+
+    <select id="selectDistributionMeasuredValueListByCharIdAndPeriod" resultType="com.spc.spc_back.dto.spcdata.ChartDistributionSourceDto">
+        SELECT
+            idt.char_id as charId,
+            idt.measured_value as measuredValue,
+            irt.insp_report_id as inspReportId,
+            irt.serial_no as serialNo,
+            irt.insp_dt as inspDt
+        FROM
+            insp_report_tb irt
+            STRAIGHT_JOIN insp_data_tb idt ON idt.insp_report_id = irt.insp_report_id
+        WHERE
+            irt.proj_id = #{projId}
+            AND
+            irt.insp_dt >= #{startDt}
+            AND irt.insp_dt &lt; #{endDt}
+            AND idt.char_id = #{charId}
+    </select>
+
+    <select id="selectMonthDetailSourceListByProjIdAndCharIdAndPeriod" resultType="com.spc.spc_back.dto.spcdata.ChartDetailSourceDto">
+        SELECT
+            idt.char_id as charId,
+            ct.char_no as charNo,
+            ct.axis as axis,
+            ct.nominal as nominal,
+            ct.u_tol as uTol,
+            ct.l_tol as lTol,
+            idt.measured_value as measuredValue,
+            irt.insp_report_id as inspReportId,
+            irt.serial_no as serialNo,
+            irt.insp_dt as inspDt
+        FROM
+            insp_report_tb irt
+            STRAIGHT_JOIN insp_data_tb idt ON idt.insp_report_id = irt.insp_report_id
+            INNER JOIN char_tb ct ON idt.char_id = ct.char_id
+        WHERE
+            irt.proj_id = #{projId}
+            AND irt.insp_dt >= #{startDt}
+            AND irt.insp_dt &lt; #{endDt}
+            AND idt.char_id = #{charId}
+    </select>
+
+    <select id="selectChartStatsByProjId" resultType="com.spc.spc_back.dto.spcdata.ChartStatRespDto">
+        SELECT
+            ct.char_id as charId,
+            ct.char_no as charNo,
+            ct.axis as axis,
+            ct.nominal as nominal,
+            ct.u_tol as uTol,
+            ct.l_tol as lTol,
+            MIN(idt.measured_value) as measuredMin,
+            MAX(idt.measured_value) as measuredMax,
+            AVG(idt.measured_value) as measuredMean,
+            COALESCE(STDDEV_POP(idt.measured_value), 0) as measuredSigma,
+            COUNT(idt.insp_data_id) as sampleCount
+        FROM
+            char_tb ct
+            LEFT JOIN insp_data_tb idt ON ct.char_id = idt.char_id
+        WHERE
+            ct.proj_id = #{projId}
+        GROUP BY
+            ct.char_id,
+            ct.char_no,
+            ct.axis,
+            ct.nominal,
+            ct.u_tol,
+            ct.l_tol
+        HAVING
+            COUNT(idt.insp_data_id) > 0
+        ORDER BY
+            ct.char_id
+    </select>
+
+    <select id="selectMeasuredValueAvgByCharId" resultType="java.lang.Double">
+        SELECT
+            AVG(idt.measured_value)
+        FROM
+            insp_data_tb idt
+        WHERE
+            idt.char_id = #{charId}
+    </select>
+
+    <select id="selectMeasuredValueStddevByCharId" resultType="java.lang.Double">
+        <![CDATA[
+        SELECT
+            STDDEV_POP(
+                CASE
+                    WHEN ct.nominal <> 0 AND ct.u_tol <> 0 AND ct.l_tol <> 0 THEN
+                        (idt.measured_value - ct.nominal) / NULLIF(ABS(ct.u_tol - ct.l_tol), 0)
+                    WHEN ct.nominal = 0 AND ct.l_tol <> 0 THEN
+                        (idt.measured_value - ct.nominal) / NULLIF(ABS(ct.u_tol - ct.l_tol), 0)
+                    WHEN ct.nominal = 0 AND ct.l_tol = 0 AND ct.u_tol > 0 THEN
+                        (idt.measured_value - ct.nominal) / NULLIF(ct.u_tol, 0)
+                    ELSE NULL
+                END
+            )
+        FROM
+            insp_data_tb idt
+            INNER JOIN char_tb ct ON idt.char_id = ct.char_id
+        WHERE
+            idt.char_id = #{charId}
+        ]]>
+    </select>
+
+    <update id="updateInspectionData">
+        UPDATE
+            insp_data_tb
+        SET
+            insp_report_id = #{inspReportId},
+            char_id = #{charId},
+            measured_value = #{measuredValue}
+        WHERE
+            insp_data_id = #{inspDataId}
+    </update>
+
+    <delete id="deleteInspectionData">
+        DELETE FROM
+            insp_data_tb
+        WHERE
+            insp_data_id = #{inspDataId}
+    </delete>
+</mapper>

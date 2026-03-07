@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.spc.spc_back.mapper.InspectionReportMapper">
+    <resultMap id="inspectionReportResultMap" type="com.spc.spc_back.entity.spcdata.InspectionReport">
+        <id property="inspReportId" column="insp_report_id" />
+        <result property="projId" column="proj_id" />
+        <result property="serialNo" column="serial_no" />
+        <result property="inspDt" column="insp_dt" />
+        <result property="createDt" column="create_dt" />
+        <result property="updateDt" column="update_dt" />
+        <collection property="inspectionDatas" resultMap="inspectionDataResultMap" />
+    </resultMap>
+    <resultMap id="inspectionReportListResultMap" type="com.spc.spc_back.entity.spcdata.InspectionReport">
+        <id property="inspReportId" column="insp_report_id" />
+        <result property="projId" column="proj_id" />
+        <result property="serialNo" column="serial_no" />
+        <result property="inspDt" column="insp_dt" />
+        <result property="createDt" column="create_dt" />
+        <result property="updateDt" column="update_dt" />
+    </resultMap>
+
+    <resultMap id="inspectionDataResultMap" type="com.spc.spc_back.entity.spcdata.InspectionData">
+        <id property="inspDataId" column="idt_insp_data_id" />
+        <result property="inspReportId" column="idt_insp_report_id" />
+        <result property="charId" column="idt_char_id" />
+        <result property="measuredValue" column="idt_measured_value" />
+        <association property="characteristic" resultMap="inspectionDataCharacteristicResultMap" />
+    </resultMap>
+
+    <resultMap id="inspectionDataCharacteristicResultMap" type="com.spc.spc_back.entity.spcdata.Characteristic">
+        <id property="charId" column="ct_char_id" />
+        <result property="projId" column="ct_proj_id" />
+        <result property="charNo" column="ct_char_no" />
+        <result property="axis" column="ct_axis" />
+        <result property="nominal" column="ct_nominal" />
+        <result property="uTol" column="ct_u_tol" />
+        <result property="lTol" column="ct_l_tol" />
+        <result property="createDt" column="ct_create_dt" />
+        <result property="updateDt" column="ct_update_dt" />
+    </resultMap>
+
+    <insert id="insertInspectionReport" useGeneratedKeys="true" keyProperty="inspReportId">
+        INSERT INTO
+            insp_report_tb
+            (proj_id, serial_no, insp_dt, create_dt, update_dt)
+        VALUES
+            (#{projId}, #{serialNo}, #{inspDt}, NOW(), null)
+    </insert>
+
+    <select id="selectInspectionReportByInspReportId" resultMap="inspectionReportResultMap">
+        SELECT
+            irt.insp_report_id,
+            irt.proj_id,
+            irt.serial_no,
+            irt.insp_dt,
+            irt.create_dt,
+            irt.update_dt,
+            idt.insp_data_id as idt_insp_data_id,
+            idt.insp_report_id as idt_insp_report_id,
+            idt.char_id as idt_char_id,
+            idt.measured_value as idt_measured_value,
+            ct.char_id as ct_char_id,
+            ct.proj_id as ct_proj_id,
+            ct.char_no as ct_char_no,
+            ct.axis as ct_axis,
+            ct.nominal as ct_nominal,
+            ct.u_tol as ct_u_tol,
+            ct.l_tol as ct_l_tol,
+            ct.create_dt as ct_create_dt,
+            ct.update_dt as ct_update_dt
+        FROM
+            insp_report_tb irt
+            LEFT JOIN insp_data_tb idt ON irt.insp_report_id = idt.insp_report_id
+            LEFT JOIN char_tb ct ON idt.char_id = ct.char_id
+        WHERE
+            irt.insp_report_id = #{inspReportId}
+        ORDER BY
+            irt.insp_report_id,
+            idt.insp_data_id
+    </select>
+
+    <select id="selectInspectionReportBySerialNo" resultMap="inspectionReportResultMap">
+        SELECT
+            irt.insp_report_id,
+            irt.proj_id,
+            irt.serial_no,
+            irt.insp_dt,
+            irt.create_dt,
+            irt.update_dt,
+            idt.insp_data_id as idt_insp_data_id,
+            idt.insp_report_id as idt_insp_report_id,
+            idt.char_id as idt_char_id,
+            idt.measured_value as idt_measured_value,
+            ct.char_id as ct_char_id,
+            ct.proj_id as ct_proj_id,
+            ct.char_no as ct_char_no,
+            ct.axis as ct_axis,
+            ct.nominal as ct_nominal,
+            ct.u_tol as ct_u_tol,
+            ct.l_tol as ct_l_tol,
+            ct.create_dt as ct_create_dt,
+            ct.update_dt as ct_update_dt
+        FROM
+            insp_report_tb irt
+            LEFT JOIN insp_data_tb idt ON irt.insp_report_id = idt.insp_report_id
+            LEFT JOIN char_tb ct ON idt.char_id = ct.char_id
+        WHERE
+            irt.serial_no = #{serialNo}
+        ORDER BY
+            irt.insp_report_id,
+            idt.insp_data_id
+    </select>
+
+    <select id="selectInspectionReportListByProjId" resultMap="inspectionReportListResultMap">
+        SELECT
+            irt.insp_report_id,
+            irt.proj_id,
+            irt.serial_no,
+            irt.insp_dt,
+            irt.create_dt,
+            irt.update_dt
+        FROM
+            insp_report_tb irt
+        WHERE
+            irt.proj_id = #{projId}
+        ORDER BY
+            irt.insp_report_id
+    </select>
+
+    <select id="selectInspectionReportCountByProjId" resultType="java.lang.Long">
+        SELECT
+            COUNT(irt.insp_report_id)
+        FROM
+            insp_report_tb irt
+        WHERE
+            irt.proj_id = #{projId}
+    </select>
+
+    <select id="selectRecentlyProjId" resultType="java.lang.Long">
+        SELECT
+            irt.proj_id
+        FROM
+            insp_report_tb irt
+        WHERE
+            irt.proj_id IS NOT NULL
+        GROUP BY
+            irt.proj_id
+        ORDER BY
+            MAX(irt.insp_dt) DESC
+        LIMIT 3
+    </select>
+
+    <update id="updateInspectionReport">
+        UPDATE
+            insp_report_tb
+        SET
+            proj_id = #{projId},
+            serial_no = #{serialNo},
+            insp_dt = #{inspDt},
+            update_dt = NOW()
+        WHERE
+            insp_report_id = #{inspReportId}
+    </update>
+
+    <delete id="deleteInspectionReport">
+        DELETE FROM
+            insp_report_tb
+        WHERE
+            insp_report_id = #{inspReportId}
+    </delete>
+</mapper>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.spc.spc_back.mapper.UserMapper">
+    <resultMap id="userResultMap" type="com.spc.spc_back.entity.user.User">
+        <id property="userId" column="user_id" />
+        <result property="username" column="username" />
+        <result property="password" column="password" />
+        <result property="createDt" column="create_dt" />
+        <result property="updateDt" column="update_dt" />
+        <collection property="userRoleList" resultMap="userRoleResultMap"/>
+    </resultMap>
+    <resultMap id="userRoleResultMap" type="com.spc.spc_back.entity.user.UserRole">
+        <id property="userRoleId" column="user_role_id" />
+        <result property="userId" column="urt_user_id" />
+        <result property="roleId" column="urt_role_id" />
+        <result property="createDt" column="urt_create_dt" />
+        <result property="updateDt" column="urt_update_dt" />
+        <association property="role" resultMap="roleResultMap"/>
+    </resultMap>
+    <resultMap id="roleResultMap" type="com.spc.spc_back.entity.user.Role">
+        <id property="roleId" column="role_id" />
+        <result property="roleName" column="role_name" />
+        <result property="roleNameKor" column="role_name_kor" />
+    </resultMap>
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="userId">
+        INSERT INTO
+            user_tb
+            (user_id, username, password, create_dt, update_dt)
+        VALUES
+            (0, #{username}, #{password}, NOW(), null)
+    </insert>
+    <select id="selectUserByUserId" resultMap="userResultMap">
+        SELECT
+            ut.user_id,
+            ut.username,
+            ut.password,
+            ut.create_dt,
+            ut.update_dt,
+            urt.user_role_id,
+            urt.user_id as urt_user_id,
+            urt.role_id as urt_role_id,
+            urt.create_dt as urt_create_dt,
+            urt.update_dt as urt_update_dt,
+            rt.role_id,
+            rt.role_name,
+            rt.role_name_kor
+        FROM
+            user_tb ut
+            LEFT JOIN user_role_tb urt ON ut.user_id = urt.user_id
+            LEFT JOIN role_tb rt ON urt.role_id = rt.role_id
+        WHERE
+            ut.user_id = #{userId}
+    </select>
+    <select id="selectUserByUsername" resultMap="userResultMap">
+        SELECT
+            ut.user_id,
+            ut.username,
+            ut.password,
+            ut.create_dt,
+            ut.update_dt,
+            urt.user_role_id,
+            urt.user_id as urt_user_id,
+            urt.role_id as urt_role_id,
+            urt.create_dt as urt_create_dt,
+            urt.update_dt as urt_update_dt,
+            rt.role_id,
+            rt.role_name,
+            rt.role_name_kor
+        FROM
+            user_tb ut
+            LEFT JOIN user_role_tb urt ON ut.user_id = urt.user_id
+            LEFT JOIN role_tb rt ON urt.role_id = rt.role_id
+        WHERE
+            ut.username = #{username}
+    </select>
+    <update id="updateUser">
+        UPDATE
+            user_tb
+        SET
+            username = #{username},
+            password = #{password},
+            update_dt = NOW()
+        WHERE
+            user_id = #{userId}
+    </update>
+    <delete id="deleteUser">
+        DELETE FROM
+            user_tb
+        WHERE
+            user_id = #{userId}
+    </delete>
+</mapper>

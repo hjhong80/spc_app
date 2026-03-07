@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.spc.spc_back.mapper.CharacteristicMapper">
+    <resultMap id="characteristicResultMap" type="com.spc.spc_back.entity.spcdata.Characteristic">
+        <id property="charId" column="char_id" />
+        <result property="projId" column="proj_id" />
+        <result property="charNo" column="char_no" />
+        <result property="axis" column="axis" />
+        <result property="nominal" column="nominal" />
+        <result property="uTol" column="u_tol" />
+        <result property="lTol" column="l_tol" />
+        <result property="createDt" column="create_dt" />
+        <result property="updateDt" column="update_dt" />
+    </resultMap>
+
+    <insert id="insertCharacteristic" useGeneratedKeys="true" keyProperty="charId">
+        INSERT INTO
+            char_tb
+            (char_id, proj_id, char_no, axis, nominal, u_tol, l_tol, create_dt, update_dt)
+        VALUES
+            (0, #{projId}, #{charNo}, #{axis}, #{nominal}, #{uTol}, #{lTol}, NOW(), null)
+    </insert>
+
+    <select id="selectCharacteristicByCharId" resultMap="characteristicResultMap">
+        SELECT
+            char_id,
+            proj_id,
+            char_no,
+            axis,
+            nominal,
+            u_tol,
+            l_tol,
+            create_dt,
+            update_dt
+        FROM
+            char_tb
+        WHERE
+            char_id = #{charId}
+    </select>
+
+    <select id="selectCharacteristicListByProjId" resultMap="characteristicResultMap">
+        SELECT
+            char_id,
+            proj_id,
+            char_no,
+            axis,
+            nominal,
+            u_tol,
+            l_tol,
+            create_dt,
+            update_dt
+        FROM
+            char_tb
+        WHERE
+            proj_id = #{projId}
+        ORDER BY
+            char_id
+    </select>
+
+    <update id="updateCharacteristic">
+        UPDATE
+            char_tb
+        SET
+            proj_id = #{projId},
+            char_no = #{charNo},
+            axis = #{axis},
+            nominal = #{nominal},
+            u_tol = #{uTol},
+            l_tol = #{lTol},
+            update_dt = NOW()
+        WHERE
+            char_id = #{charId}
+    </update>
+
+    <delete id="deleteCharacteristic">
+        DELETE FROM
+            char_tb
+        WHERE
+            char_id = #{charId}
+    </delete>
+</mapper>

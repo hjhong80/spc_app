@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.spc.spc_back.mapper.UserRoleMapper">
+    <resultMap id="userRoleResultMap" type="com.spc.spc_back.entity.user.UserRole">
+        <id property="userRoleId" column="user_role_id" />
+        <result property="userId" column="user_id" />
+        <result property="roleId" column="role_id" />
+        <result property="createDt" column="create_dt" />
+        <result property="updateDt" column="update_dt" />
+    </resultMap>
+    <insert id="insertUserRole" useGeneratedKeys="true" keyProperty="userRoleId">
+        INSERT INTO
+            user_role_tb
+            (user_role_id, user_id, role_id, create_dt, update_dt)
+        VALUES
+            (0, #{userId}, #{roleId}, NOW(), null)
+    </insert>
+    <update id="updateUserRole">
+        UPDATE
+            user_role_tb
+        SET
+            user_id = #{userId},
+            role_id = #{roleId},
+            update_dt = NOW()
+        WHERE
+            user_role_id = #{userRoleId}
+    </update>
+</mapper>
