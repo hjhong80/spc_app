@@ -5,9 +5,9 @@
 - 업로드 API의 `parseAndPreview(...)`와 listener 저장 경로가 같은 공통 저장 규칙을 사용하도록 정리한다.
 
 ## 현재 문제
-- [`InspectionDataListener`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/main/java/com/spc/spc_back/listener/InspectionDataListener.java)는 `List<ExcelInputReqDto> + lotNo`만 넘기고 있어 저장에 필요한 `projId`, `serialNo`, `inspDt`, `measuredValue`를 전달하지 못한다.
-- [`ExcelInputReqDto`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/main/java/com/spc/spc_back/dto/spcdata/ExcelInputReqDto.java)는 `qualityIndicator`, `nominal`만 포함해 실제 특성치 매핑과 저장 규칙에 필요한 값이 부족하다.
-- [`InspectionServiceImpl`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/main/java/com/spc/spc_back/service/InspectionServiceImpl.java)는 내부 `InspectionBatchSaveCommand`로 공통 저장 코어를 이미 갖고 있지만, 외부 listener 경로에서는 접근할 수 없다.
+- [`InspectionDataListener`](../../spc_back/src/main/java/com/spc/spc_back/listener/InspectionDataListener.java)는 `List<ExcelInputReqDto> + lotNo`만 넘기고 있어 저장에 필요한 `projId`, `serialNo`, `inspDt`, `measuredValue`를 전달하지 못한다.
+- [`ExcelInputReqDto`](../../spc_back/src/main/java/com/spc/spc_back/dto/spcdata/ExcelInputReqDto.java)는 `qualityIndicator`, `nominal`만 포함해 실제 특성치 매핑과 저장 규칙에 필요한 값이 부족하다.
+- [`InspectionServiceImpl`](../../spc_back/src/main/java/com/spc/spc_back/service/InspectionServiceImpl.java)는 내부 `InspectionBatchSaveCommand`로 공통 저장 코어를 이미 갖고 있지만, 외부 listener 경로에서는 접근할 수 없다.
 
 ## 목표
 - listener 경로와 upload preview 경로가 같은 공통 저장 코어를 사용한다.

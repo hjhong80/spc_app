@@ -6,7 +6,7 @@
 
 ## 현재 문제
 - 백엔드는 `ReportService` 레벨에서 MySQL 통합 테스트가 추가됐지만, 컨트롤러 계층은 아직 자동 검증이 없다.
-- [`ReportController`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/main/java/com/spc/spc_back/controller/spcdata/report/ReportController.java)는 `@AuthenticationPrincipal`, path variable, query parameter에 의존하므로 리팩터링 중 매핑이 조용히 깨질 수 있다.
+- [`ReportController`](../../spc_back/src/main/java/com/spc/spc_back/controller/spcdata/report/ReportController.java)는 `@AuthenticationPrincipal`, path variable, query parameter에 의존하므로 리팩터링 중 매핑이 조용히 깨질 수 있다.
 
 ## 목표
 - `recently-project`, `chart-stats`, `detail`, `distribution`, `report-count` 전 엔드포인트를 한 번에 검증한다.

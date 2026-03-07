@@ -6,8 +6,8 @@
 - 정규분포용 raw 측정값은 새 백엔드 엔드포인트로 기간 조건 조회해 성능 저하를 방지한다.
 
 ## 현재 구조
-- 세부 차트는 [`Chart.jsx`](/c:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/page/Chart.jsx)에서 `detailScale`에 따라 월은 캔들, 일은 꺾은선으로 렌더링한다.
-- 세부 차트 컨테이너는 [`DetailCharacteristicChart.jsx`](/c:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/component/chart/DetailCharacteristicChart.jsx)에서 우측 상단 `overlayControls`를 이미 지원한다.
+- 세부 차트는 [`Chart.jsx`](../../spc_front/src/page/Chart.jsx)에서 `detailScale`에 따라 월은 캔들, 일은 꺾은선으로 렌더링한다.
+- 세부 차트 컨테이너는 [`DetailCharacteristicChart.jsx`](../../spc_front/src/component/chart/DetailCharacteristicChart.jsx)에서 우측 상단 `overlayControls`를 이미 지원한다.
 - 현재 백엔드 detail API는 전체 특성 데이터를 읽어 자바에서 월/일로 자른 뒤 집계한다. 정규분포 raw 점 렌더링에는 비효율적이다.
 
 ## UI 설계

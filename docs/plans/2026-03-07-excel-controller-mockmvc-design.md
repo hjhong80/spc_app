@@ -5,8 +5,8 @@
 - multipart 파라미터, 성공/실패 상태 코드, duplicate skip 메시지 분기가 기대대로 유지되는지 검증한다.
 
 ## 현재 문제
-- [`ExcelController`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/main/java/com/spc/spc_back/controller/spcdata/excel/ExcelController.java)는 업로드 API의 유일한 진입점이지만 컨트롤러 레벨 테스트가 없다.
-- 저장 자체는 [`InspectionServiceParseAndPreviewIntegrationTest`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/test/java/com/spc/spc_back/service/InspectionServiceParseAndPreviewIntegrationTest.java#L35)에서 검증하지만, API 응답 메시지와 HTTP 상태 분기는 별도로 고정되지 않았다.
+- [`ExcelController`](../../spc_back/src/main/java/com/spc/spc_back/controller/spcdata/excel/ExcelController.java)는 업로드 API의 유일한 진입점이지만 컨트롤러 레벨 테스트가 없다.
+- 저장 자체는 [`InspectionServiceParseAndPreviewIntegrationTest`](../../spc_back/src/test/java/com/spc/spc_back/service/InspectionServiceParseAndPreviewIntegrationTest.java#L35)에서 검증하지만, API 응답 메시지와 HTTP 상태 분기는 별도로 고정되지 않았다.
 
 ## 목표
 - `POST /excel/upload`의 multipart 요청 계약을 검증한다.

@@ -5,7 +5,7 @@
 - `charId`, 기간 조건, 프로젝트 존재 조건, 집계값 계산이 함께 맞는지 확인한다.
 
 ## 현재 문제
-- 기존 [`ReportServiceDistributionTest`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/test/java/com/spc/spc_back/service/spcdata/ReportServiceDistributionTest.java)는 Mockito 기반 단위 테스트다.
+- 기존 [`ReportServiceDistributionTest`](../../spc_back/src/test/java/com/spc/spc_back/service/spcdata/ReportServiceDistributionTest.java)는 Mockito 기반 단위 테스트다.
 - repository 결과를 모킹하므로 mapper SQL, 조인, 기간 조건, 정렬, 집계 정확도를 검증하지 못한다.
 
 ## 목표

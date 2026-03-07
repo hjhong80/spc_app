@@ -5,8 +5,8 @@
 - 외부 API 계약은 유지하면서, 내부 구조는 `preview`와 `save` 책임을 분리해 다음 단계의 API 분리를 쉽게 만든다.
 
 ## 현재 문제
-- [`InspectionServiceImpl.parseAndPreview(...)`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/main/java/com/spc/spc_back/service/InspectionServiceImpl.java)는 파싱, preview 응답 생성, DB 저장을 모두 수행한다.
-- [`InspectionService.saveBatch(List<ExcelInputReqDto>, String)`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/main/java/com/spc/spc_back/service/InspectionService.java#L11)는 legacy 시그니처만 있고 실제 저장은 비어 있다.
+- [`InspectionServiceImpl.parseAndPreview(...)`](../../spc_back/src/main/java/com/spc/spc_back/service/InspectionServiceImpl.java)는 파싱, preview 응답 생성, DB 저장을 모두 수행한다.
+- [`InspectionService.saveBatch(List<ExcelInputReqDto>, String)`](../../spc_back/src/main/java/com/spc/spc_back/service/InspectionService.java#L11)는 legacy 시그니처만 있고 실제 저장은 비어 있다.
 - `InspectionDataListener` 경로는 현재 저장에 필요한 `projId`, `serialNo`, `inspDt`, `measuredValue`를 충분히 전달하지 못해 실제 저장 규칙과 맞지 않는다.
 
 ## 목표

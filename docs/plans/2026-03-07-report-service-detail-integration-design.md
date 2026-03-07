@@ -5,7 +5,7 @@
 - 월/일 상세 조회의 기간 필터, 기본 `baseDate` fallback, 응답 bucket 생성이 기대대로 동작하는지 확인한다.
 
 ## 현재 문제
-- 현재 백엔드는 [`ReportServiceDistributionIntegrationTest`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/src/test/java/com/spc/spc_back/service/spcdata/ReportServiceDistributionIntegrationTest.java)만 실제 MySQL 컨테이너 기준으로 검증한다.
+- 현재 백엔드는 [`ReportServiceDistributionIntegrationTest`](../../spc_back/src/test/java/com/spc/spc_back/service/spcdata/ReportServiceDistributionIntegrationTest.java)만 실제 MySQL 컨테이너 기준으로 검증한다.
 - 상세 차트 조회는 성적서와 측정 데이터를 메모리에서 재조합하므로, 기간 필터나 기본 날짜 선택이 바뀌면 프론트 상세 차트가 조용히 깨질 수 있다.
 
 ## 목표

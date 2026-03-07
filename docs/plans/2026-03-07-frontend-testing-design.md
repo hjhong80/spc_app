@@ -6,7 +6,7 @@
 - 깃허브 업로드 전 최소한의 회귀 방지 장치를 만든다.
 
 ## 현재 구조
-- [`spc_front/package.json`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/package.json)에는 테스트 러너가 없다.
+- [`spc_front/package.json`](../../spc_front/package.json)에는 테스트 러너가 없다.
 - 현재 검증은 `lint`와 `build` 중심이다.
 - 최근 추가한 차트 성능 helper 테스트는 `node:test` 기반 임시 형태다.
 - 주요 리스크는 차트 페이지, 프로젝트 선택, 업로드/매핑 같은 사용자 흐름에 있다.
@@ -47,8 +47,8 @@
   - 데이터 변환 함수
   - 다운샘플링/시리즈 생성 같은 순수 로직
 - 초기 대상:
-  - [`chartDownsampling.js`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/features/chart/chartDownsampling.js)
-  - [`chartSeriesBuilder.js`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/features/chart/chartSeriesBuilder.js)
+  - [`chartDownsampling.js`](../../spc_front/src/features/chart/chartDownsampling.js)
+  - [`chartSeriesBuilder.js`](../../spc_front/src/features/chart/chartSeriesBuilder.js)
 
 ### 2. 컴포넌트 테스트 계층
 - 대상:
@@ -56,7 +56,7 @@
   - 토글/버튼 클릭
   - 조건부 렌더링
 - 초기 대상:
-  - [`SpcDataChartPanel.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/component/spc-data/SpcDataChartPanel.jsx)
+  - [`SpcDataChartPanel.jsx`](../../spc_front/src/component/spc-data/SpcDataChartPanel.jsx)
 
 ### 3. E2E 계층
 - 대상:

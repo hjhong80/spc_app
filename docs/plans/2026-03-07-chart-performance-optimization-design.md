@@ -6,10 +6,10 @@
 - 깃허브 업로드 전 구조를 정리해 이후 유지보수와 추가 최적화가 쉬운 상태로 만든다.
 
 ## 현재 문제
-- [`Chart.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/page/Chart.jsx)가 데이터 정규화, 계산, 차트 옵션 생성, 뷰 상태 관리를 한 파일에서 모두 처리한다.
+- [`Chart.jsx`](../../spc_front/src/page/Chart.jsx)가 데이터 정규화, 계산, 차트 옵션 생성, 뷰 상태 관리를 한 파일에서 모두 처리한다.
 - 메인 차트와 세부 차트가 모두 ApexCharts에 의존하고, 차트 라이브러리가 페이지 전환 시 바로 마운트된다.
 - 메인 차트 초기 진입 시 전체 원본 데이터를 기반으로 큰 옵션 객체와 시리즈를 동시에 생성해 렌더 비용이 크다.
-- [`MainCharacteristicChart.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/component/chart/MainCharacteristicChart.jsx)는 Y축 툴팁 오버레이를 위해 DOM 관찰을 수행해 차트 갱신 시 추가 비용이 발생한다.
+- [`MainCharacteristicChart.jsx`](../../spc_front/src/component/chart/MainCharacteristicChart.jsx)는 Y축 툴팁 오버레이를 위해 DOM 관찰을 수행해 차트 갱신 시 추가 비용이 발생한다.
 
 ## 목표 성능 기준
 - 차트 페이지 진입 후 첫 메인 차트 표시를 3초 이내로 맞춘다.
@@ -19,7 +19,7 @@
 ## 아키텍처 설계
 
 ### 1. 페이지 오케스트레이션 분리
-- [`Chart.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/page/Chart.jsx)는 아래 역할만 담당한다.
+- [`Chart.jsx`](../../spc_front/src/page/Chart.jsx)는 아래 역할만 담당한다.
 - 라우트 상태 복원
 - 서버 데이터 요청 및 로딩/오류 상태 관리
 - 메인/세부 보기 전환
@@ -34,8 +34,8 @@
 - 메인 차트용 데이터는 “초기 렌더용 요약 데이터”와 “세부 진입 후 사용하는 원본 참조”를 분리한다.
 
 ### 3. 렌더 계층 단순화
-- [`MainCharacteristicChart.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/component/chart/MainCharacteristicChart.jsx)와 [`DetailCharacteristicChart.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/component/chart/DetailCharacteristicChart.jsx)는 계산된 `options`, `series`, `interaction callbacks`만 받도록 유지한다.
-- [`SpcDataChartPanel.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/component/spc-data/SpcDataChartPanel.jsx)는 lazy load 가능한 차트 패널로 바꾼다.
+- [`MainCharacteristicChart.jsx`](../../spc_front/src/component/chart/MainCharacteristicChart.jsx)와 [`DetailCharacteristicChart.jsx`](../../spc_front/src/component/chart/DetailCharacteristicChart.jsx)는 계산된 `options`, `series`, `interaction callbacks`만 받도록 유지한다.
+- [`SpcDataChartPanel.jsx`](../../spc_front/src/component/spc-data/SpcDataChartPanel.jsx)는 lazy load 가능한 차트 패널로 바꾼다.
 
 ## 데이터 흐름 설계
 

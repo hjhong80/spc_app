@@ -6,7 +6,7 @@
 - 이후 문서와 `.gitignore` 정리까지 연결 가능한 상태로 마무리한다.
 
 ## 현재 문제
-- [`Chart.jsx`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/src/page/Chart.jsx)에서 정규분포 선택 시 매번 distribution API를 다시 호출한다.
+- [`Chart.jsx`](../../spc_front/src/page/Chart.jsx)에서 정규분포 선택 시 매번 distribution API를 다시 호출한다.
 - 같은 `charId + scale + baseDate` 조합이어도 응답을 재사용하지 않는다.
 - `buildDistributionAxisScale`, `buildDistributionCurveData`, `buildDistributionPointData`가 캐시 없이 다시 계산된다.
 - 정규분포 토글 전환이 즉시 동기 상태 변경으로 처리되어 UI 멈춤이 체감될 수 있다.

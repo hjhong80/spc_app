@@ -6,7 +6,7 @@
 - 남는 전이 의존성 취약점은 `overrides`로 통제한다.
 
 ## 현재 상태
-- [`spc_front/package.json`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/package.json)에 테스트 도구가 추가된 상태다.
+- [`spc_front/package.json`](../../spc_front/package.json)에 테스트 도구가 추가된 상태다.
 - `npm audit` 결과는 총 5건이다.
   - `axios`: high, 직접 의존성
   - `rollup`: high, 전이 의존성
