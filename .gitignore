@@ -2,13 +2,43 @@
 .vscode/
 .idea/
 
+# IDE metadata
+*.iml
+*.ipr
+*.iws
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
 # Build artifacts
 spc_front/node_modules/
 spc_front/dist/
+spc_front/dist-ssr/
 spc_front/coverage/
 spc_front/playwright-report/
 spc_front/test-results/
+spc_front/docs/
 spc_back/target/
+spc_back/build/
+spc_back/.github/java-upgrade/
+spc_back/HELP.md
 
 # Local environment files
 application.properties
@@ -17,14 +47,15 @@ application-*.properties
 .env.*
 spc.env
 
-# Local data files
-*.xls
-*.xlsx
-*.xlsm
-
-# Checked-in examples
+# Checked-in configuration templates
+!spc_back/src/main/resources/application.properties
 !spc_back/application-example.properties
 !spc_back/src/test/resources/application.properties
 !spc_front/.env.example
 !spc_front/.env.codegen.example
 !deploy/spc.env.example
+
+# Local data files
+*.xls
+*.xlsx
+*.xlsm
