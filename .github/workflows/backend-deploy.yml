@@ -79,4 +79,14 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl restart "${{ env.SYSTEMD_SERVICE_NAME }}"
             sudo systemctl status "${{ env.SYSTEMD_SERVICE_NAME }}" --no-pager
-            curl -fsS http://127.0.0.1:8080/spc/api/v3/api-docs >/dev/null
+
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8080/spc/api/v3/api-docs >/dev/null; then
+                exit 0
+              fi
+              sleep 2
+            done
+
+            sudo systemctl status "${{ env.SYSTEMD_SERVICE_NAME }}" --no-pager || true
+            journalctl -u "${{ env.SYSTEMD_SERVICE_NAME }}" -n 100 --no-pager || true
+            exit 1
