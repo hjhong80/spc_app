@@ -1,20 +1,28 @@
-﻿.docs/
+.docs/
 .vscode/
 .idea/
+
+# Build artifacts
 spc_front/node_modules/
 spc_front/dist/
 spc_front/coverage/
 spc_front/playwright-report/
 spc_front/test-results/
 spc_back/target/
+
+# Local environment files
 application.properties
 application-*.properties
 .env
 .env.*
 spc.env
+
+# Local data files
 *.xls
 *.xlsx
 *.xlsm
+
+# Checked-in examples
 !spc_back/application-example.properties
 !spc_back/src/test/resources/application.properties
 !spc_front/.env.example

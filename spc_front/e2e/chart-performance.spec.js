@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const CHART_ROUTE_STATE_STORAGE_KEY = 'spc_chart_route_state';
+const API_ROUTE_BASE = '**/spc/api/spcdata/report/project/1';
 
 const chartRouteState = {
     project: {
@@ -75,16 +76,16 @@ test('chart page meets production performance thresholds', async ({ page }) => {
         window.sessionStorage.setItem('spc_chart_route_state', JSON.stringify(state));
     }, chartRouteState);
 
-    await page.route('http://localhost:8080/spcdata/report/project/1/chart-stats', async (route) => {
+    await page.route(`${API_ROUTE_BASE}/chart-stats`, async (route) => {
         await route.fulfill({ json: chartStatsResponse });
     });
-    await page.route('http://localhost:8080/spcdata/report/project/1/report-count', async (route) => {
+    await page.route(`${API_ROUTE_BASE}/report-count`, async (route) => {
         await route.fulfill({ json: { status: 'success', message: 'ok', data: 42 } });
     });
-    await page.route(/http:\/\/localhost:8080\/spcdata\/report\/project\/1\/characteristic\/101\/detail.*/, async (route) => {
+    await page.route(new RegExp('.*/spc/api/spcdata/report/project/1/characteristic/101/detail.*'), async (route) => {
         await route.fulfill({ json: detailResponse });
     });
-    await page.route(/http:\/\/localhost:8080\/spcdata\/report\/project\/1\/characteristic\/101\/distribution.*/, async (route) => {
+    await page.route(new RegExp('.*/spc/api/spcdata/report/project/1/characteristic/101/distribution.*'), async (route) => {
         await route.fulfill({ json: distributionResponse });
     });
 

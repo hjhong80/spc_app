@@ -66,9 +66,9 @@ Excel 업로드
 ```
 
 주요 저장소 구조:
-- [`spc_front`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front): React/Vite 프론트엔드
-- [`spc_back`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back): Spring Boot/MyBatis 백엔드
-- [`docs`](/C:/Users/USER/Documents/MyProjects/spc_project/docs): 설계, 작업 히스토리, DB 문서
+- [`spc_front`](spc_front): React/Vite 프론트엔드
+- [`spc_back`](spc_back): Spring Boot/MyBatis 백엔드
+- [`docs`](docs): 설계, 작업 히스토리, DB 문서
 
 ## 신뢰성 포인트
 - 프론트 단위 테스트와 브라우저 E2E 테스트를 모두 구성했습니다.
@@ -79,19 +79,34 @@ Excel 업로드
 ## 로컬 실행
 
 ### Backend
-1. [`spc_back`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back)로 이동
-2. `spc.env` 또는 `deploy/spc.env` 준비
-3. `mvnw.cmd spring-boot:run`
+1. 프로젝트 루트에 `spc.env`를 준비합니다.
+2. JWT Base64가 필요하면 아래 명령으로 새 값을 생성합니다.
+
+```powershell
+$bytes = New-Object byte[] 64; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); [Convert]::ToBase64String($bytes)
+```
+
+3. 프로젝트 루트에서 백엔드를 실행합니다.
+
+```powershell
+spc_back\mvnw.cmd -f spc_back\pom.xml spring-boot:run
+```
+
 4. 로컬 문서 주소
    - Swagger UI: `http://localhost:8080/spc/api/swagger-ui/index.html`
    - OpenAPI: `http://localhost:8080/spc/api/v3/api-docs`
 
 ### Frontend
-1. [`spc_front`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front)로 이동
-2. `.env.local`을 `.env.example` 기준으로 생성
+1. [`spc_front`](spc_front)로 이동
+2. `.env.local`을 `.env.example` 기준으로 생성합니다.
 3. `npm install`
 4. `npm run dev`
 5. 로컬 주소: `http://localhost:5173`
+
+로컬 파일 기준:
+- 백엔드 실제 설정: `spc.env`
+- 프론트 실제 설정: `spc_front/.env.local`
+- 배포 서버 예시: `deploy/spc.env.example`
 
 ## 테스트 / 검증
 
@@ -110,18 +125,19 @@ Excel 업로드
 ## 환경설정 전략
 - 실제 비밀 파일은 GitHub에 올리지 않습니다.
 - 저장소에는 예시 파일만 남깁니다.
-  - [`spc_back/application-example.properties`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_back/application-example.properties)
-  - [`spc_front/.env.example`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/.env.example)
-  - [`spc_front/.env.codegen.example`](/C:/Users/USER/Documents/MyProjects/spc_project/spc_front/.env.codegen.example)
-  - [`deploy/spc.env.example`](/C:/Users/USER/Documents/MyProjects/spc_project/deploy/spc.env.example)
+  - [`spc_back/application-example.properties`](spc_back/application-example.properties)
+  - [`spc_front/.env.example`](spc_front/.env.example)
+  - [`spc_front/.env.codegen.example`](spc_front/.env.codegen.example)
+  - [`deploy/spc.env.example`](deploy/spc.env.example)
 - 백엔드 변수는 `SPC_*`, 프론트 변수는 `VITE_SPC_*` 네임스페이스를 사용합니다.
+- 로컬은 루트 `spc.env`, 프론트 `spc_front/.env.local`을 기준으로 실행합니다.
 - 배포 시 서버의 `spc.env`와 GitHub Actions secrets/variables를 함께 사용하는 구조를 전제로 합니다.
 
 ## 문서
-- 문서 인덱스: [docs/README.md](/C:/Users/USER/Documents/MyProjects/spc_project/docs/README.md)
-- 작업 히스토리: [docs/history](/C:/Users/USER/Documents/MyProjects/spc_project/docs/history)
-- DB 문서: [docs/database/schema.md](/C:/Users/USER/Documents/MyProjects/spc_project/docs/database/schema.md)
-- 설계/구현 계획: [docs/plans](/C:/Users/USER/Documents/MyProjects/spc_project/docs/plans)
+- 문서 인덱스: [docs/README.md](docs/README.md)
+- 작업 히스토리: [docs/history](docs/history)
+- DB 문서: [docs/database/schema.md](docs/database/schema.md)
+- 설계/구현 계획: [docs/plans](docs/plans)
 
 ## 다음 단계
 - GitHub Actions 기반 CI/CD
