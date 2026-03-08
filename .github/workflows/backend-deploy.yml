@@ -70,6 +70,7 @@ jobs:
           port: ${{ vars.VM_PORT || 22 }}
           script: |
             set -euo pipefail
+            deploy_started_at=$(date -u +"%Y-%m-%d %H:%M:%S")
 
             sudo mkdir -p "${{ env.DEPLOY_BACKEND_PATH }}"
             sudo install -m 0644 /tmp/spc_back-0.0.1-SNAPSHOT.jar "${{ env.DEPLOY_BACKEND_FILE }}"
@@ -80,7 +81,7 @@ jobs:
             sudo systemctl restart "${{ env.SYSTEMD_SERVICE_NAME }}"
             sudo systemctl status "${{ env.SYSTEMD_SERVICE_NAME }}" --no-pager
 
-            for i in $(seq 1 30); do
+            for i in $(seq 1 90); do
               if curl -fsS http://127.0.0.1:8080/spc/api/v3/api-docs >/dev/null; then
                 exit 0
               fi
@@ -88,5 +89,5 @@ jobs:
             done
 
             sudo systemctl status "${{ env.SYSTEMD_SERVICE_NAME }}" --no-pager || true
-            journalctl -u "${{ env.SYSTEMD_SERVICE_NAME }}" -n 100 --no-pager || true
+            journalctl -u "${{ env.SYSTEMD_SERVICE_NAME }}" --since "${deploy_started_at}" --no-pager || true
             exit 1
