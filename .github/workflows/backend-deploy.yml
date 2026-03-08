@@ -1,0 +1,82 @@
+name: spc-backend-deploy
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "spc_back/**"
+      - ".github/workflows/backend-deploy.yml"
+      - "deploy/systemd/**"
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      DEPLOY_BACKEND_PATH: /opt/spc/backend
+      DEPLOY_BACKEND_FILE: /opt/spc/backend/app.jar
+      LOCAL_JAR_PATH: spc_back/target/spc_back-0.0.1-SNAPSHOT.jar
+      SYSTEMD_SERVICE_NAME: spc-backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build backend jar
+        run: |
+          chmod +x spc_back/mvnw
+          ./spc_back/mvnw -f spc_back/pom.xml -DskipTests package
+
+      - name: Upload backend jar
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ vars.VM_PORT || 22 }}
+          source: ${{ env.LOCAL_JAR_PATH }}
+          target: /tmp
+          strip_components: 2
+
+      - name: Upload systemd service file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ vars.VM_PORT || 22 }}
+          source: deploy/systemd/spc-backend.service
+          target: /tmp
+          strip_components: 2
+
+      - name: Deploy backend on VM
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ vars.VM_PORT || 22 }}
+          script: |
+            set -euo pipefail
+
+            sudo mkdir -p "${{ env.DEPLOY_BACKEND_PATH }}"
+            sudo install -m 0644 /tmp/spc_back-0.0.1-SNAPSHOT.jar "${{ env.DEPLOY_BACKEND_FILE }}"
+            sudo install -m 0644 /tmp/spc-backend.service /etc/systemd/system/spc-backend.service
+            sudo chown "${USER}:${USER}" "${{ env.DEPLOY_BACKEND_FILE }}"
+
+            sudo systemctl daemon-reload
+            sudo systemctl restart "${{ env.SYSTEMD_SERVICE_NAME }}"
+            sudo systemctl status "${{ env.SYSTEMD_SERVICE_NAME }}" --no-pager
+            curl -fsS http://127.0.0.1:8080/spc/api/v3/api-docs >/dev/null

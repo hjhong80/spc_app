@@ -1,0 +1,103 @@
+name: spc-frontend-deploy
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "spc_front/**"
+      - ".github/workflows/frontend-deploy.yml"
+      - "deploy/nginx/**"
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      DEPLOY_FRONTEND_PATH: /opt/spc/frontend
+      FRONTEND_ARCHIVE: frontend-dist.tgz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: spc_front/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: spc_front
+        run: npm ci
+
+      - name: Create production frontend env
+        working-directory: spc_front
+        run: |
+          cat <<'EOF' > .env.production.local
+          VITE_SPC_APP_BASE_PATH=/spc
+          VITE_SPC_API_BASE_URL=/spc/api
+          EOF
+
+      - name: Build frontend
+        working-directory: spc_front
+        run: npm run build
+
+      - name: Archive frontend dist
+        run: tar -czf "${FRONTEND_ARCHIVE}" -C spc_front dist
+
+      - name: Upload frontend archive
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ vars.VM_PORT || 22 }}
+          source: ${{ env.FRONTEND_ARCHIVE }}
+          target: /tmp
+
+      - name: Upload nginx site config
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ vars.VM_PORT || 22 }}
+          source: deploy/nginx/zustand.store.conf
+          target: /tmp
+          strip_components: 2
+
+      - name: Deploy frontend on VM
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ vars.VM_PORT || 22 }}
+          script: |
+            set -euo pipefail
+
+            rm -rf /tmp/spc-frontend-dist
+            mkdir -p /tmp/spc-frontend-dist
+            tar -xzf "/tmp/${{ env.FRONTEND_ARCHIVE }}" -C /tmp/spc-frontend-dist
+
+            sudo mkdir -p "${{ env.DEPLOY_FRONTEND_PATH }}"
+            sudo rsync -a --delete /tmp/spc-frontend-dist/dist/ "${{ env.DEPLOY_FRONTEND_PATH }}/"
+            sudo chown -R "${USER}:${USER}" "${{ env.DEPLOY_FRONTEND_PATH }}"
+
+            sudo install -m 0644 /tmp/zustand.store.conf /etc/nginx/sites-available/zustand.store
+            if [ ! -L /etc/nginx/sites-enabled/zustand.store ]; then
+              sudo ln -s /etc/nginx/sites-available/zustand.store /etc/nginx/sites-enabled/zustand.store
+            fi
+
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            rm -rf /tmp/spc-frontend-dist
+            rm -f "/tmp/${{ env.FRONTEND_ARCHIVE }}"
+            rm -f /tmp/zustand.store.conf

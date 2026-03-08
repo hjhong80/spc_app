@@ -1,0 +1,17 @@
+[Unit]
+Description=SPC Spring Boot Backend
+After=network.target
+
+[Service]
+Type=simple
+User=ghdgowns
+Group=ghdgowns
+WorkingDirectory=/opt/spc/backend
+EnvironmentFile=/opt/spc/shared/spc.env
+ExecStart=/usr/bin/java -jar /opt/spc/backend/app.jar
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
