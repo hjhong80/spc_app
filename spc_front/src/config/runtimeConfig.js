@@ -23,16 +23,18 @@ export const resolveRouterBasename = (
         : normalizedBasePath.replace(/\/$/, '');
 };
 
-export const resolveApiBaseUrl = (
-    apiBaseUrl = import.meta.env.VITE_SPC_API_BASE_URL,
-) => {
-    const normalized = String(apiBaseUrl || '').trim();
+export function resolveApiBaseUrl(apiBaseUrl) {
+    const resolvedApiBaseUrl =
+        arguments.length === 0
+            ? import.meta.env.VITE_SPC_API_BASE_URL
+            : apiBaseUrl;
+    const normalized = String(resolvedApiBaseUrl || '').trim();
     if (!normalized) {
         return DEFAULT_API_BASE_URL;
     }
 
     return normalized.replace(/\/+$/, '');
-};
+}
 
 export const buildPublicAssetPath = (
     assetPath,

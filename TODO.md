@@ -7,10 +7,12 @@
 ## 해야 할 일
 - 엑셀 대량 등록 성능 개선
   - 업로드 900건 수준에서 체감 저하가 있는지 재현 조건 정리
-  - `InspectionServiceImpl.persistBatch()`의 측정 데이터 건별 insert를 batch insert로 전환 검토
-  - `selectInspectionReportBySerialNo` 기반 중복 체크를 존재 확인용 경량 쿼리로 분리
-  - 업로드 시 행별 `INFO` 로그 출력량 축소 또는 `DEBUG` 전환 검토
-  - 필요 시 `WorkbookFactory` 기반 전체 로딩 대신 streaming/EasyExcel 경로 전환 검토
+  - 완료: 측정 데이터 저장 경로를 batch insert로 전환
+  - 완료: serial 중복 체크를 exists 기반 경량 조회로 분리
+  - 완료: 행별 업로드 로그를 `DEBUG`로 낮추고 응답은 샘플 preview만 반환
+  - 완료: 메타데이터는 `WorkbookFactory`, 측정 행은 EasyExcel 스트리밍으로 읽는 하이브리드 경로 적용
+  - 후속: 운영 환경 900건 수준 업로드 체감 시간과 DB 부하 재계측
+  - 후속: preview 샘플 건수와 batch flush 크기 운영값 튜닝
 
 ## 참고 메모
 - 차트 조회 성능은 현재 매우 양호하며, 우선 최적화 대상은 조회보다 엑셀 업로드 저장 경로에 가깝다

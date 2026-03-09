@@ -113,6 +113,17 @@
             idt.insp_data_id
     </select>
 
+    <select id="existsBySerialNo" resultType="boolean">
+        SELECT EXISTS(
+            SELECT
+                1
+            FROM
+                insp_report_tb
+            WHERE
+                serial_no = #{serialNo}
+        )
+    </select>
+
     <select id="selectInspectionReportListByProjId" resultMap="inspectionReportListResultMap">
         SELECT
             irt.insp_report_id,

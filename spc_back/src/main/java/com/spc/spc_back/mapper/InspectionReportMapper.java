@@ -14,6 +14,8 @@ public interface InspectionReportMapper {
 
     InspectionReport selectInspectionReportBySerialNo(String serialNo);
 
+    boolean existsBySerialNo(String serialNo);
+
     List<InspectionReport> selectInspectionReportListByProjId(Long projId);
 
     Long selectInspectionReportCountByProjId(Long projId);

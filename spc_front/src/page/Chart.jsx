@@ -1,6 +1,15 @@
-import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+    startTransition,
+    useCallback,
+    useDeferredValue,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import {
     Alert,
+    Badge,
     Box,
     Chip,
     IconButton,
@@ -12,10 +21,10 @@ import {
 } from '@mui/material';
 import MessageIcon from '@mui/icons-material/Message';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DetailCharacteristicChart from '../component/chart/DetailCharacteristicChart';
 import MainCharacteristicChart from '../component/chart/MainCharacteristicChart';
+import ChartFloatingNotification from '../component/chart/ChartFloatingNotification';
 import { customInstance } from '../apis/custom-instance';
 import { navigateBackOrFallback } from '../utils/navigation';
 import {
@@ -44,6 +53,17 @@ import {
     recordChartPerfMetric,
     setChartPerfTestApi,
 } from '../features/chart/chartPerfMonitor';
+import {
+    appendChartNotification,
+    CHART_NOTIFICATION_SEVERITY,
+    createChartNotification,
+    getChartNotificationAlertSurfaceStyle,
+    getChartNotificationAutoHideDuration,
+    getChartNotificationContextKey,
+    getHighestChartNotificationSeverity,
+    shouldResetChartNotificationsForContextChange,
+    shouldUseFloatingChartNotification,
+} from './chartNotifications';
 
 const SIGMA_MULTIPLIER = 2;
 const Y_AXIS_LINEAR_PERCENT_LIMIT = 100;
@@ -1474,9 +1494,10 @@ const Chart = () => {
     const [projectReportCount, setProjectReportCount] = useState(null);
     const [backendStatusMessage, setBackendStatusMessage] = useState('');
     const [backendErrorMessage, setBackendErrorMessage] = useState('');
-    const [isWarningSnackbarOpen, setIsWarningSnackbarOpen] = useState(false);
-    const [isDetailNoiseWarningOpen, setIsDetailNoiseWarningOpen] = useState(false);
-    const [isSuccessSnackbarOpen, setIsSuccessSnackbarOpen] = useState(false);
+    const [chartNotifications, setChartNotifications] = useState([]);
+    const [activeChartNotification, setActiveChartNotification] = useState(null);
+    const [isChartNotificationOpen, setIsChartNotificationOpen] = useState(false);
+    const [messageAnchorEl, setMessageAnchorEl] = useState(null);
     const [isInfoSnackbarOpen, setIsInfoSnackbarOpen] = useState(false);
     const [infoAnchorEl, setInfoAnchorEl] = useState(null);
     const [activeChartView, setActiveChartView] = useState('main');
@@ -1499,10 +1520,14 @@ const Chart = () => {
     const [detailDistributionData, setDetailDistributionData] = useState(null);
     const [isDetailDistributionLoading, setIsDetailDistributionLoading] = useState(false);
     const [detailDistributionErrorMessage, setDetailDistributionErrorMessage] = useState('');
-    const [detailDistributionPerfSummary, setDetailDistributionPerfSummary] = useState('');
     const detailDistributionResponseCacheRef = useRef(new Map());
     const detailDistributionComputationCacheRef = useRef(new Map());
     const detailDistributionPerfRef = useRef(null);
+    const detailPerfAnchorRef = useRef(null);
+    const lastBackendStatusMessageRef = useRef('');
+    const lastBackendErrorMessageRef = useRef('');
+    const lastDetailNoiseWarningMessageRef = useRef('');
+    const previousChartNotificationContextKeyRef = useRef(null);
     const chartPerfEnabledRef = useRef(isChartPerfEnabled());
     const mainReadyPerfRef = useRef(
         chartPerfEnabledRef.current ? { startedAt: performance.now(), completed: false } : null,
@@ -1543,48 +1568,42 @@ const Chart = () => {
         };
     };
 
-    const handleWarningIconClick = () => {
-        if (!backendErrorMessage) {
+    const pushChartNotification = useCallback((severity, message, options = {}) => {
+        if (!message) {
             return;
         }
-        setIsWarningSnackbarOpen(true);
-    };
 
-    const handleWarningSnackbarClose = (_, reason) => {
+        const notification = createChartNotification({
+            severity,
+            message,
+            source: options.source || '',
+        });
+        setChartNotifications((prev) => appendChartNotification(prev, notification));
+
+        if (options.openSnackbar) {
+            setActiveChartNotification(notification);
+            setIsChartNotificationOpen(true);
+        }
+    }, []);
+
+    const handleChartNotificationClose = (_, reason) => {
         if (reason === 'clickaway') {
             return;
         }
-        setIsWarningSnackbarOpen(false);
-    };
-
-    const handleDetailNoiseWarningClick = () => {
-        setIsDetailNoiseWarningOpen(true);
-    };
-
-    const handleDetailNoiseWarningClose = (_, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setIsDetailNoiseWarningOpen(false);
-    };
-
-    const handleSuccessIconClick = () => {
-        if (!backendStatusMessage || backendErrorMessage) {
-            return;
-        }
-        setIsSuccessSnackbarOpen(true);
-    };
-
-    const handleSuccessSnackbarClose = (_, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setIsSuccessSnackbarOpen(false);
+        setIsChartNotificationOpen(false);
     };
 
     const handleInfoIconClick = (event) => {
         setInfoAnchorEl(event.currentTarget);
         setIsInfoSnackbarOpen(true);
+    };
+
+    const handleMessageIconClick = (event) => {
+        setMessageAnchorEl(event.currentTarget);
+    };
+
+    const handleMessagePopoverClose = () => {
+        setMessageAnchorEl(null);
     };
 
     const handleInfoSnackbarClose = (_, reason) => {
@@ -1594,6 +1613,36 @@ const Chart = () => {
         setInfoAnchorEl(null);
         setIsInfoSnackbarOpen(false);
     };
+
+    const chartNotificationContextKey = useMemo(
+        () =>
+            getChartNotificationContextKey({
+                activeChartView,
+                detailScale,
+            }),
+        [activeChartView, detailScale],
+    );
+
+    const highestChartNotificationSeverity = useMemo(
+        () => getHighestChartNotificationSeverity(chartNotifications),
+        [chartNotifications],
+    );
+
+    const chartMessageIconColor = {
+        [CHART_NOTIFICATION_SEVERITY.ERROR]: '#ff5f6d',
+        [CHART_NOTIFICATION_SEVERITY.WARNING]: '#ffb74d',
+        [CHART_NOTIFICATION_SEVERITY.SUCCESS]: '#66bb6a',
+        [CHART_NOTIFICATION_SEVERITY.INFO]: '#29b6f6',
+    }[highestChartNotificationSeverity || CHART_NOTIFICATION_SEVERITY.INFO];
+
+    const activeChartNotificationStyle = getChartNotificationAlertSurfaceStyle(
+        activeChartNotification?.severity || CHART_NOTIFICATION_SEVERITY.INFO,
+    );
+    const isFloatingChartNotification =
+        isChartNotificationOpen &&
+        shouldUseFloatingChartNotification(activeChartNotification?.severity) &&
+        activeChartView === 'detail' &&
+        Boolean(detailPerfAnchorRef.current);
 
     useEffect(() => {
         if (!chartPerfEnabledRef.current) {
@@ -1611,6 +1660,29 @@ const Chart = () => {
             clearChartPerfState();
         };
     }, []);
+
+    useEffect(() => {
+        const previousKey = previousChartNotificationContextKeyRef.current;
+
+        if (!previousKey) {
+            previousChartNotificationContextKeyRef.current = chartNotificationContextKey;
+            return;
+        }
+
+        if (
+            shouldResetChartNotificationsForContextChange(
+                previousKey,
+                chartNotificationContextKey,
+            )
+        ) {
+            setChartNotifications([]);
+            setActiveChartNotification(null);
+            setIsChartNotificationOpen(false);
+            setMessageAnchorEl(null);
+        }
+
+        previousChartNotificationContextKeyRef.current = chartNotificationContextKey;
+    }, [chartNotificationContextKey]);
 
     useEffect(() => {
         if (location.state) {
@@ -1746,16 +1818,36 @@ const Chart = () => {
     }, [project?.projId]);
 
     useEffect(() => {
-        if (!backendErrorMessage) {
-            setIsWarningSnackbarOpen(false);
+        const warningMessage = backendErrorMessage
+            ? `${backendErrorMessage} (fallback 데이터로 표시 중)`
+            : '';
+
+        if (!warningMessage) {
+            lastBackendErrorMessageRef.current = '';
+            return;
         }
-    }, [backendErrorMessage]);
+
+        if (warningMessage !== lastBackendErrorMessageRef.current) {
+            pushChartNotification(CHART_NOTIFICATION_SEVERITY.WARNING, warningMessage, {
+                source: 'backend-warning',
+            });
+            lastBackendErrorMessageRef.current = warningMessage;
+        }
+    }, [backendErrorMessage, pushChartNotification]);
 
     useEffect(() => {
         if (!backendStatusMessage || backendErrorMessage) {
-            setIsSuccessSnackbarOpen(false);
+            lastBackendStatusMessageRef.current = '';
+            return;
         }
-    }, [backendErrorMessage, backendStatusMessage]);
+
+        if (backendStatusMessage !== lastBackendStatusMessageRef.current) {
+            pushChartNotification(CHART_NOTIFICATION_SEVERITY.SUCCESS, backendStatusMessage, {
+                source: 'backend-success',
+            });
+            lastBackendStatusMessageRef.current = backendStatusMessage;
+        }
+    }, [backendErrorMessage, backendStatusMessage, pushChartNotification]);
 
     const measurementGroups = useMemo(() => {
         const normalizedGroups = normalizeIncomingRows(incomingRows);
@@ -2586,9 +2678,21 @@ const Chart = () => {
 
     useEffect(() => {
         if (!detailNoiseWarningMessage) {
-            setIsDetailNoiseWarningOpen(false);
+            lastDetailNoiseWarningMessageRef.current = '';
+            return;
         }
-    }, [detailNoiseWarningMessage]);
+
+        if (detailNoiseWarningMessage !== lastDetailNoiseWarningMessageRef.current) {
+            pushChartNotification(
+                CHART_NOTIFICATION_SEVERITY.ERROR,
+                detailNoiseWarningMessage,
+                {
+                    source: 'detail-noise-warning',
+                },
+            );
+            lastDetailNoiseWarningMessageRef.current = detailNoiseWarningMessage;
+        }
+    }, [detailNoiseWarningMessage, pushChartNotification]);
 
     const detailDistributionCurveData =
         detailDistributionComputed?.curveData ?? [];
@@ -2753,7 +2857,6 @@ const Chart = () => {
         });
 
         pendingPerf.completed = true;
-        setDetailDistributionPerfSummary(summary);
 
         const isCachedMeasurement =
             pendingPerf.responseCacheStatus === 'hit' &&
@@ -2772,6 +2875,10 @@ const Chart = () => {
         );
 
         if (IS_DEV_MODE) {
+            pushChartNotification(CHART_NOTIFICATION_SEVERITY.INFO, summary, {
+                source: 'detail-distribution-perf',
+                openSnackbar: true,
+            });
             console.info(
                 '[DetailDistributionPerf]',
                 buildDetailDistributionPerfPayload({
@@ -2789,6 +2896,7 @@ const Chart = () => {
         detailDistributionResponseCacheKey,
         detailSeries,
         detailVisualMode,
+        pushChartNotification,
     ]);
 
     const detailChartWidthRatio = useMemo(
@@ -2855,64 +2963,43 @@ const Chart = () => {
 
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.7 }}>
-                {IS_DEV_MODE && detailDistributionPerfSummary && (
-                    <Chip
+                <Box ref={detailPerfAnchorRef}>
+                    <ToggleButtonGroup
                         size="small"
-                        label={detailDistributionPerfSummary}
+                        exclusive
+                        value={detailVisualMode}
+                        onChange={(_, nextValue) => {
+                            if (nextValue) {
+                                startTransition(() => {
+                                    setDetailVisualMode(nextValue);
+                                });
+                            }
+                        }}
                         sx={{
-                            alignSelf: 'flex-end',
-                            maxWidth: 'min(360px, 62vw)',
-                            height: 24,
-                            borderRadius: '999px',
-                            border: '1px solid rgba(41,182,246,0.35)',
-                            bgcolor: 'rgba(10,28,44,0.9)',
-                            color: '#cfefff',
-                            '& .MuiChip-label': {
+                            '& .MuiToggleButton-root': {
+                                borderColor: 'rgba(163,163,163,0.2)',
+                                color: '#cfcfcf',
                                 px: 1,
-                                fontSize: '0.72rem',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
+                                py: 0.35,
+                                minHeight: 28,
+                                minWidth: 92,
+                                bgcolor: 'rgba(33,36,41,0.9)',
+                                textTransform: 'none',
+                                justifyContent: 'center',
+                            },
+                            '& .Mui-selected': {
+                                bgcolor: 'rgba(45,140,255,0.18) !important',
+                                color: '#8ec5ff',
                             },
                         }}
-                        title={detailDistributionPerfSummary}
-                    />
-                )}
-                <ToggleButtonGroup
-                    size="small"
-                    exclusive
-                    value={detailVisualMode}
-                    onChange={(_, nextValue) => {
-                        if (nextValue) {
-                            startTransition(() => {
-                                setDetailVisualMode(nextValue);
-                            });
-                        }
-                    }}
-                    sx={{
-                        '& .MuiToggleButton-root': {
-                            borderColor: 'rgba(163,163,163,0.2)',
-                            color: '#cfcfcf',
-                            px: 1,
-                            py: 0.35,
-                            minHeight: 28,
-                            minWidth: 92,
-                            bgcolor: 'rgba(33,36,41,0.9)',
-                            textTransform: 'none',
-                            justifyContent: 'center',
-                        },
-                        '& .Mui-selected': {
-                            bgcolor: 'rgba(45,140,255,0.18) !important',
-                            color: '#8ec5ff',
-                        },
-                    }}
-                >
-                    <ToggleButton value={DETAIL_VISUAL_BASE}>{baseLabel}</ToggleButton>
-                    <ToggleButton value={DETAIL_VISUAL_DISTRIBUTION}>정규 분포</ToggleButton>
-                </ToggleButtonGroup>
+                    >
+                        <ToggleButton value={DETAIL_VISUAL_BASE}>{baseLabel}</ToggleButton>
+                        <ToggleButton value={DETAIL_VISUAL_DISTRIBUTION}>정규 분포</ToggleButton>
+                    </ToggleButtonGroup>
+                </Box>
             </Box>
         );
-    }, [detailDistributionPerfSummary, detailScale, detailVisualMode]);
+    }, [detailScale, detailVisualMode]);
 
     const detailOptions = useMemo(() => {
         if (isDetailDistributionChart) {
@@ -3677,49 +3764,41 @@ const Chart = () => {
                 }
                 rightSlot={
                     <>
-                        {!backendErrorMessage && backendStatusMessage && (
+                        {chartNotifications.length > 0 && (
                             <IconButton
                                 size="small"
-                                onClick={handleSuccessIconClick}
+                                onClick={handleMessageIconClick}
                                 sx={{
-                                    color: '#66bb6a',
+                                    color: chartMessageIconColor,
                                     '&:hover': {
-                                        bgcolor: 'rgba(102,187,106,0.12)',
+                                        bgcolor:
+                                            highestChartNotificationSeverity ===
+                                            CHART_NOTIFICATION_SEVERITY.ERROR
+                                                ? 'rgba(255,95,109,0.12)'
+                                                : highestChartNotificationSeverity ===
+                                                    CHART_NOTIFICATION_SEVERITY.WARNING
+                                                  ? 'rgba(255,183,77,0.12)'
+                                                  : highestChartNotificationSeverity ===
+                                                      CHART_NOTIFICATION_SEVERITY.SUCCESS
+                                                    ? 'rgba(102,187,106,0.12)'
+                                                    : 'rgba(41,182,246,0.12)',
                                     },
                                 }}
-                                title="성공 메시지 보기"
+                                title="메시지 보기"
                             >
-                                <MessageIcon fontSize="small" />
-                            </IconButton>
-                        )}
-                        {backendErrorMessage && (
-                            <IconButton
-                                size="small"
-                                onClick={handleWarningIconClick}
-                                sx={{
-                                    color: '#ffb74d',
-                                    '&:hover': {
-                                        bgcolor: 'rgba(255,183,77,0.12)',
-                                    },
-                                }}
-                                title="경고 메시지 보기"
-                            >
-                                <MessageIcon fontSize="small" />
-                            </IconButton>
-                        )}
-                        {detailNoiseWarningMessage && (
-                            <IconButton
-                                size="small"
-                                onClick={handleDetailNoiseWarningClick}
-                                sx={{
-                                    color: '#ff5f6d',
-                                    '&:hover': {
-                                        bgcolor: 'rgba(255,95,109,0.12)',
-                                    },
-                                }}
-                                title="노이즈 경고 보기"
-                            >
-                                <ErrorOutlineIcon fontSize="small" />
+                                <Badge
+                                    badgeContent={chartNotifications.length}
+                                    max={99}
+                                    sx={{
+                                        '& .MuiBadge-badge': {
+                                            bgcolor: chartMessageIconColor,
+                                            color: '#0b1118',
+                                            fontWeight: 700,
+                                        },
+                                    }}
+                                >
+                                    <MessageIcon fontSize="small" />
+                                </Badge>
                             </IconButton>
                         )}
                     </>
@@ -3754,98 +3833,134 @@ const Chart = () => {
                 )}
             </Box>
 
-            <Snackbar
-                open={isSuccessSnackbarOpen}
-                autoHideDuration={5000}
-                onClose={handleSuccessSnackbarClose}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                sx={{
-                    mt: '84px',
-                    mr: 3,
-                }}
-            >
-                <Alert
-                    severity="success"
-                    onClose={handleSuccessSnackbarClose}
+            {isFloatingChartNotification ? (
+                <ChartFloatingNotification
+                    open={isChartNotificationOpen}
+                    anchorEl={detailPerfAnchorRef.current}
+                    notification={activeChartNotification}
+                    onClose={handleChartNotificationClose}
+                />
+            ) : (
+                <Snackbar
+                    open={isChartNotificationOpen}
+                    autoHideDuration={getChartNotificationAutoHideDuration(
+                        activeChartNotification?.severity,
+                    )}
+                    onClose={handleChartNotificationClose}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
                     sx={{
-                        bgcolor: '#163324',
-                        color: '#d4f5de',
-                        border: '1px solid #66bb6a',
-                        boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
-                        opacity: 1,
-                        '& .MuiAlert-icon': {
-                            color: '#66bb6a',
-                        },
-                        '& .MuiAlert-action': {
-                            color: '#a5d6a7',
-                        },
+                        mt: '84px',
+                        mr: 3,
                     }}
                 >
-                    {backendStatusMessage}
-                </Alert>
-            </Snackbar>
+                    <Alert
+                        severity={
+                            activeChartNotification?.severity || CHART_NOTIFICATION_SEVERITY.INFO
+                        }
+                        onClose={handleChartNotificationClose}
+                        sx={{
+                            bgcolor: activeChartNotificationStyle.bgcolor,
+                            color: activeChartNotificationStyle.color,
+                            border: activeChartNotificationStyle.border,
+                            boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
+                            opacity: 1,
+                            '& .MuiAlert-icon': {
+                                color: activeChartNotificationStyle.iconColor,
+                            },
+                            '& .MuiAlert-action': {
+                                color: activeChartNotificationStyle.actionColor,
+                            },
+                        }}
+                    >
+                        {activeChartNotification?.message || ''}
+                    </Alert>
+                </Snackbar>
+            )}
 
-            <Snackbar
-                open={isWarningSnackbarOpen}
-                autoHideDuration={7000}
-                onClose={handleWarningSnackbarClose}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                sx={{
-                    mt: '84px',
-                    mr: 3,
+            <Popover
+                open={Boolean(messageAnchorEl)}
+                anchorEl={messageAnchorEl}
+                onClose={handleMessagePopoverClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            mt: 1,
+                            minWidth: '320px',
+                            maxWidth: '420px',
+                            backgroundColor: 'transparent',
+                            boxShadow: 'none',
+                            overflow: 'visible',
+                        },
+                    },
                 }}
             >
-                <Alert
-                    severity="warning"
-                    onClose={handleWarningSnackbarClose}
-                    sx={{
-                        bgcolor: '#3b2a14',
-                        color: '#ffe8c2',
-                        border: '1px solid #ffb74d',
-                        boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
-                        opacity: 1,
-                        '& .MuiAlert-icon': {
-                            color: '#ffb74d',
-                        },
-                        '& .MuiAlert-action': {
-                            color: '#ffcc80',
-                        },
-                    }}
-                >
-                    {backendErrorMessage} (fallback 데이터로 표시 중)
-                </Alert>
-            </Snackbar>
-
-            <Snackbar
-                open={isDetailNoiseWarningOpen}
-                autoHideDuration={8000}
-                onClose={handleDetailNoiseWarningClose}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                sx={{
-                    mt: '84px',
-                    mr: 3,
-                }}
-            >
-                <Alert
-                    severity="error"
-                    onClose={handleDetailNoiseWarningClose}
-                    sx={{
-                        bgcolor: '#42161a',
-                        color: '#ffdadd',
-                        border: '1px solid #ff5f6d',
-                        boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
-                        opacity: 1,
-                        '& .MuiAlert-icon': {
-                            color: '#ff5f6d',
-                        },
-                        '& .MuiAlert-action': {
-                            color: '#ff9aa4',
-                        },
-                    }}
-                >
-                    {detailNoiseWarningMessage}
-                </Alert>
-            </Snackbar>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {chartNotifications.map((notification) => (
+                        <Alert
+                            key={notification.id}
+                            severity={notification.severity}
+                            sx={{
+                                bgcolor:
+                                    notification.severity === CHART_NOTIFICATION_SEVERITY.ERROR
+                                        ? '#42161a'
+                                        : notification.severity ===
+                                            CHART_NOTIFICATION_SEVERITY.WARNING
+                                          ? '#3b2a14'
+                                          : notification.severity ===
+                                              CHART_NOTIFICATION_SEVERITY.SUCCESS
+                                            ? '#163324'
+                                            : '#0f2942',
+                                color:
+                                    notification.severity === CHART_NOTIFICATION_SEVERITY.ERROR
+                                        ? '#ffdadd'
+                                        : notification.severity ===
+                                            CHART_NOTIFICATION_SEVERITY.WARNING
+                                          ? '#ffe8c2'
+                                          : notification.severity ===
+                                              CHART_NOTIFICATION_SEVERITY.SUCCESS
+                                            ? '#d4f5de'
+                                            : '#e3f2fd',
+                                border:
+                                    notification.severity === CHART_NOTIFICATION_SEVERITY.ERROR
+                                        ? '1px solid #ff5f6d'
+                                        : notification.severity ===
+                                            CHART_NOTIFICATION_SEVERITY.WARNING
+                                          ? '1px solid #ffb74d'
+                                          : notification.severity ===
+                                              CHART_NOTIFICATION_SEVERITY.SUCCESS
+                                            ? '1px solid #66bb6a'
+                                            : '1px solid #29b6f6',
+                                boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
+                                '& .MuiAlert-icon': {
+                                    color:
+                                        notification.severity ===
+                                        CHART_NOTIFICATION_SEVERITY.ERROR
+                                            ? '#ff5f6d'
+                                            : notification.severity ===
+                                                CHART_NOTIFICATION_SEVERITY.WARNING
+                                              ? '#ffb74d'
+                                              : notification.severity ===
+                                                  CHART_NOTIFICATION_SEVERITY.SUCCESS
+                                                ? '#66bb6a'
+                                                : '#29b6f6',
+                                },
+                            }}
+                        >
+                            <Typography variant="body2" sx={{ color: 'inherit' }}>
+                                {notification.message}
+                            </Typography>
+                        </Alert>
+                    ))}
+                </Box>
+            </Popover>
 
             <Popover
                 open={isInfoSnackbarOpen}

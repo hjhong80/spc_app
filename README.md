@@ -17,8 +17,9 @@
 
 ### 1. Excel 업로드와 저장
 - 프론트에서 성적서 샘플을 기준으로 열 매핑을 설정합니다.
-- 백엔드는 EasyExcel 기반 파싱 후 `insp_report_tb`, `insp_data_tb`에 저장합니다.
+- 백엔드는 메타데이터는 `WorkbookFactory`, 측정 행은 EasyExcel 스트리밍으로 읽은 뒤 `insp_report_tb`, `insp_data_tb`에 저장합니다.
 - duplicate serial number, axis 기반 characteristic 매칭, 날짜/시간 셀 분리 같은 실제 운영 케이스를 처리합니다.
+- 업로드 응답은 전체 parsed row 대신 요약 정보와 일부 preview 샘플만 반환합니다.
 
 ### 2. SPC 차트 시각화
 - 메인 차트는 특성치 단위 SPC 상태를 요약합니다.

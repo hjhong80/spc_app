@@ -80,6 +80,8 @@ class InspectionServiceBatchSaveIntegrationTest {
                     assertThat(data.getCharId()).isEqualTo(101L);
                     assertThat(data.getMeasuredValue()).isEqualTo(10.4);
                 });
+
+        assertThat(inspectionReportRepository.existsBySerialNo("LOT-BATCH-NEW")).isTrue();
     }
 
     @Test
@@ -110,6 +112,46 @@ class InspectionServiceBatchSaveIntegrationTest {
                 .satisfies(data -> {
                     assertThat(data.getCharId()).isEqualTo(101L);
                     assertThat(data.getMeasuredValue()).isEqualTo(9.9);
+                });
+    }
+
+    @Test
+    void 공통saveBatch는저장불가행을건너뛰고집계를반영한다() {
+        inspectionService.saveBatch(InspectionBatchSaveReqDto.builder()
+                .projId(1L)
+                .serialNo("LOT-BATCH-SKIP")
+                .inspDt(LocalDateTime.of(2026, 5, 7, 9, 15))
+                .rows(List.of(
+                        InspectionBatchRowReqDto.builder()
+                                .excelRowNo(2)
+                                .charNo("C-01")
+                                .axis("X")
+                                .nominal(10.0)
+                                .uTol(0.5)
+                                .lTol(-0.5)
+                                .measuredValue(10.1)
+                                .build(),
+                        InspectionBatchRowReqDto.builder()
+                                .excelRowNo(3)
+                                .charNo("")
+                                .axis("X")
+                                .nominal(10.0)
+                                .uTol(0.5)
+                                .lTol(-0.5)
+                                .measuredValue(10.2)
+                                .build()))
+                .build());
+
+        InspectionReport savedReport = inspectionReportRepository.selectInspectionReportBySerialNo("LOT-BATCH-SKIP")
+                .orElseThrow();
+
+        assertThat(inspectionDataRepository.selectInspectionDataListByInspReportId(savedReport.getInspReportId())
+                .orElseThrow())
+                .hasSize(1)
+                .first()
+                .satisfies(data -> {
+                    assertThat(data.getCharId()).isEqualTo(101L);
+                    assertThat(data.getMeasuredValue()).isEqualTo(10.1);
                 });
     }
 }

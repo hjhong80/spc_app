@@ -15,6 +15,8 @@ import com.spc.spc_back.entity.spcdata.InspectionData;
 public interface InspectionDataMapper {
     int insertInspectionData(InspectionData inspectionData);
 
+    int insertInspectionDataBatch(@Param("items") List<InspectionData> items);
+
     List<InspectionData> selectInspectionDataListByInspReportId(Long inspReportId);
 
     List<InspectionData> selectInspectionDataListByCharId(Long charId);

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 
+const APP_BASE_PATH = '/spc';
 const CHART_ROUTE_STATE_STORAGE_KEY = 'spc_chart_route_state';
 const API_ROUTE_BASE = '**/spc/api/spcdata/report/project/1';
 
@@ -89,7 +90,7 @@ test('chart page meets production performance thresholds', async ({ page }) => {
         await route.fulfill({ json: distributionResponse });
     });
 
-    await page.goto('/chart');
+    await page.goto(`${APP_BASE_PATH}/chart/`);
 
     await page.waitForFunction(() => Boolean(window.__SPC_CHART_PERF__?.metrics?.mainReady));
 

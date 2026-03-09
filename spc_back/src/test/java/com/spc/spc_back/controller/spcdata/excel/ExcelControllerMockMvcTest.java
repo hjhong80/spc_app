@@ -75,7 +75,19 @@ class ExcelControllerMockMvcTest {
                 .inspDt("2026-05-05 14:30:00")
                 .skippedDuplicateSerialNo(false)
                 .skipReason("")
-                .parsedRowCount(1)
+                .parsedRowCount(950)
+                .insertedRowCount(900)
+                .skippedRowCount(50)
+                .parsedRows(List.of(
+                        ExcelParsePreviewRespDto.ParsedRow.builder()
+                                .excelRowNo(2)
+                                .charNo("C-01")
+                                .axis("X")
+                                .nominal(10.0)
+                                .uTol(0.5)
+                                .lTol(-0.5)
+                                .measuredValue(10.4)
+                                .build()))
                 .build();
 
         when(inspectionService.parseAndPreview(same(file), eq("LOT-001"), eq(1L)))
@@ -91,7 +103,10 @@ class ExcelControllerMockMvcTest {
                 .andExpect(jsonPath("$.status").value("success"))
                 .andExpect(jsonPath("$.message").value("Excel upload/parse 및 DB 저장이 완료되었습니다."))
                 .andExpect(jsonPath("$.data.serialNo").value("LOT-001"))
-                .andExpect(jsonPath("$.data.parsedRowCount").value(1));
+                .andExpect(jsonPath("$.data.parsedRowCount").value(950))
+                .andExpect(jsonPath("$.data.insertedRowCount").value(900))
+                .andExpect(jsonPath("$.data.skippedRowCount").value(50))
+                .andExpect(jsonPath("$.data.parsedRows.length()").value(1));
 
         verify(inspectionService).parseAndPreview(same(file), eq("LOT-001"), eq(1L));
     }

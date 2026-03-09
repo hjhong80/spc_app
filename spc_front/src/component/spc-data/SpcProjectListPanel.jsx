@@ -37,38 +37,12 @@ const SpcProjectListPanel = ({
                 bgcolor: 'background.paper',
             }}
         >
-            <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1.5}
-                sx={{ mb: 1.5, alignItems: 'stretch' }}
+            <Typography
+                variant="h6"
+                sx={{ color: 'neutral.200', fontWeight: 700, fontSize: '1.5rem', lineHeight: 1.4, mb: 0.5 }}
             >
-                <TextField
-                    size="small"
-                    label="프로젝트 검색"
-                    placeholder="번호 또는 이름"
-                    value={searchKeyword}
-                    onChange={(event) => onSearchKeywordChange(event.target.value)}
-                    fullWidth
-                    sx={{
-                        flex: { sm: '0 1 78%' },
-                        minWidth: 0,
-                    }}
-                />
-                <Button
-                    variant="outlined"
-                    onClick={onRefresh}
-                    disabled={isLoading}
-                    sx={{
-                        flex: { sm: '0 0 140px' },
-                        minWidth: { sm: 140 },
-                        width: { xs: '100%', sm: 140 },
-                        whiteSpace: 'nowrap',
-                        px: 2.5,
-                    }}
-                >
-                    새로고침
-                </Button>
-            </Stack>
+                데이터 조회
+            </Typography>
 
             <Typography variant="subtitle1" sx={{ color: 'neutral.200', fontWeight: 600, mb: 1 }}>
                 프로젝트 리스트
@@ -174,6 +148,39 @@ const SpcProjectListPanel = ({
                     </List>
                 )}
             </Box>
+
+            <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1.5}
+                sx={{ mt: 1.5, alignItems: 'stretch' }}
+            >
+                <TextField
+                    size="small"
+                    label="프로젝트 검색"
+                    placeholder="번호 또는 이름"
+                    value={searchKeyword}
+                    onChange={(event) => onSearchKeywordChange(event.target.value)}
+                    fullWidth
+                    sx={{
+                        flex: { sm: '0 1 78%' },
+                        minWidth: 0,
+                    }}
+                />
+                <Button
+                    variant="outlined"
+                    onClick={onRefresh}
+                    disabled={isLoading}
+                    sx={{
+                        flex: { sm: '0 0 140px' },
+                        minWidth: { sm: 140 },
+                        width: { xs: '100%', sm: 140 },
+                        whiteSpace: 'nowrap',
+                        px: 2.5,
+                    }}
+                >
+                    새로고침
+                </Button>
+            </Stack>
 
             {statusMessage && (
                 <Typography

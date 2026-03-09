@@ -64,6 +64,9 @@ class InspectionServiceParseAndPreviewIntegrationTest {
         assertThat(response.getSerialNo()).isEqualTo("LOT-NEW");
         assertThat(response.getInspDt()).isEqualTo("2026-05-05 14:30:00");
         assertThat(response.getParsedRowCount()).isEqualTo(1);
+        assertThat(response.getInsertedRowCount()).isEqualTo(1);
+        assertThat(response.getSkippedRowCount()).isEqualTo(0);
+        assertThat(response.getParsedRows()).hasSize(1);
 
         InspectionReport savedReport = inspectionReportRepository.selectInspectionReportBySerialNo("LOT-NEW")
                 .orElseThrow();
@@ -88,12 +91,38 @@ class InspectionServiceParseAndPreviewIntegrationTest {
 
         assertThat(response.getSkippedDuplicateSerialNo()).isTrue();
         assertThat(response.getParsedRowCount()).isEqualTo(0);
+        assertThat(response.getInsertedRowCount()).isEqualTo(0);
+        assertThat(response.getSkippedRowCount()).isEqualTo(0);
+        assertThat(response.getParsedRows()).isEmpty();
         assertThat(response.getSkipReason()).contains("이미 등록된 serialNo");
         assertThat(inspectionReportRepository.selectInspectionReportBySerialNo("SN-1001")).isPresent();
         assertThat(inspectionReportRepository.selectInspectionReportBySerialNo("LOT-NEW")).isNotPresent();
     }
 
+    @Test
+    void parseAndPreview는대용량업로드에서미리보기샘플만반환한다() throws IOException {
+        MockMultipartFile file = createExcelFile(LocalDateTime.of(2026, 5, 5, 14, 30), 950, 10.0);
+
+        ExcelParsePreviewRespDto response = inspectionService.parseAndPreview(file, "LOT-BULK-950", 1L);
+
+        assertThat(response.getSkippedDuplicateSerialNo()).isFalse();
+        assertThat(response.getParsedRowCount()).isEqualTo(950);
+        assertThat(response.getInsertedRowCount()).isEqualTo(950);
+        assertThat(response.getSkippedRowCount()).isEqualTo(0);
+        assertThat(response.getParsedRows()).hasSizeLessThanOrEqualTo(20);
+
+        InspectionReport savedReport = inspectionReportRepository.selectInspectionReportBySerialNo("LOT-BULK-950")
+                .orElseThrow();
+        assertThat(inspectionDataRepository.selectInspectionDataListByInspReportId(savedReport.getInspReportId())
+                .orElseThrow())
+                .hasSize(950);
+    }
+
     private MockMultipartFile createExcelFile(LocalDateTime inspDt, double measuredValue) throws IOException {
+        return createExcelFile(inspDt, 1, measuredValue);
+    }
+
+    private MockMultipartFile createExcelFile(LocalDateTime inspDt, int rowCount, double measuredValueStart) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             var sheet = workbook.createSheet("Sheet1");
             var metaRow = sheet.createRow(0);
@@ -105,13 +134,15 @@ class InspectionServiceParseAndPreviewIntegrationTest {
             dateStyle.setDataFormat(creationHelper.createDataFormat().getFormat("yyyy-mm-dd hh:mm:ss"));
             dateCell.setCellStyle(dateStyle);
 
-            var dataRow = sheet.createRow(1);
-            dataRow.createCell(0).setCellValue("C-01");
-            dataRow.createCell(1).setCellValue("X");
-            dataRow.createCell(2).setCellValue(10.0);
-            dataRow.createCell(3).setCellValue(0.5);
-            dataRow.createCell(4).setCellValue(-0.5);
-            dataRow.createCell(5).setCellValue(measuredValue);
+            for (int index = 0; index < rowCount; index += 1) {
+                var dataRow = sheet.createRow(index + 1);
+                dataRow.createCell(0).setCellValue("C-01");
+                dataRow.createCell(1).setCellValue("X");
+                dataRow.createCell(2).setCellValue(10.0);
+                dataRow.createCell(3).setCellValue(0.5);
+                dataRow.createCell(4).setCellValue(-0.5);
+                dataRow.createCell(5).setCellValue(measuredValueStart + index);
+            }
 
             workbook.write(outputStream);
 

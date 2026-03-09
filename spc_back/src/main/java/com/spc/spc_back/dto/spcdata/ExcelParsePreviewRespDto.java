@@ -31,6 +31,8 @@ public class ExcelParsePreviewRespDto {
     private String skipReason;
 
     private Integer parsedRowCount;
+    private Integer insertedRowCount;
+    private Integer skippedRowCount;
     private List<ParsedRow> parsedRows;
 
     @Data

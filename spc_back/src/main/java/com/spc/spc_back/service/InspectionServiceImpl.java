@@ -44,6 +44,8 @@ import com.spc.spc_back.repository.CharacteristicRepository;
 import com.spc.spc_back.repository.InspectionDataRepository;
 import com.spc.spc_back.repository.InspectionReportRepository;
 import com.spc.spc_back.repository.ProjectRepository;
+import com.spc.spc_back.service.excel.StreamingInspectionRowReader;
+import com.spc.spc_back.service.excel.StreamingUploadAccumulator;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +55,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class InspectionServiceImpl implements InspectionService {
     private static final int LOG_PREVIEW_ROW_LIMIT = 20;
+    private static final int STREAMING_BATCH_SIZE = 500;
     private static final DateTimeFormatter DATETIME_OUTPUT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_OUTPUT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_OUTPUT_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -100,6 +103,7 @@ public class InspectionServiceImpl implements InspectionService {
     private final InspectionReportRepository inspectionReportRepository;
     private final InspectionDataRepository inspectionDataRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final StreamingInspectionRowReader streamingInspectionRowReader = new StreamingInspectionRowReader();
 
     @Override
     public void saveBatch(List<ExcelInputReqDto> rows, String lotNo) {
@@ -183,32 +187,44 @@ public class InspectionServiceImpl implements InspectionService {
                         .skippedDuplicateSerialNo(true)
                         .skipReason(skipReason)
                         .parsedRowCount(0)
+                        .insertedRowCount(0)
+                        .skippedRowCount(0)
                         .parsedRows(Collections.emptyList())
                         .build();
             }
 
-            List<ExcelParsePreviewRespDto.ParsedRow> parsedRows = parseRows(
-                    sheet,
-                    formatter,
+            CharacteristicLookup lookup = loadCharacteristicLookup(project.getProjId());
+            InspectionReport inspectionReport = insertInspectionReport(project.getProjId(), serialNo, inspDt);
+            StreamingUploadAccumulator accumulator = new StreamingUploadAccumulator(LOG_PREVIEW_ROW_LIMIT);
+            List<InspectionBatchRowReqDto> batchRows = new ArrayList<>(STREAMING_BATCH_SIZE);
+
+            streamingInspectionRowReader.read(
+                    file.getInputStream(),
                     dataStartRow,
                     charNoCol,
                     axisCol,
                     nominalCol,
                     uTolCol,
                     lTolCol,
-                    measuredValueCol);
-            if (parsedRows.isEmpty()) {
+                    measuredValueCol,
+                    parsedRow -> {
+                        accumulator.recordParsedRow(parsedRow);
+                        batchRows.add(toBatchRow(parsedRow));
+
+                        if (batchRows.size() >= STREAMING_BATCH_SIZE) {
+                            flushParsedRows(inspectionReport.getInspReportId(), batchRows, lookup, accumulator);
+                        }
+                    });
+
+            if (accumulator.getParsedRowCount() == 0) {
                 throw new IllegalArgumentException("파싱된 측정 데이터가 없습니다. 프로젝트 컬럼 매핑을 확인하세요.");
             }
 
-            saveBatch(InspectionBatchSaveReqDto.builder()
-                    .projId(project.getProjId())
-                    .serialNo(serialNo)
-                    .inspDt(inspDt)
-                    .rows(parsedRows.stream()
-                            .map(this::toBatchRow)
-                            .collect(Collectors.toList()))
-                    .build());
+            flushParsedRows(inspectionReport.getInspReportId(), batchRows, lookup, accumulator);
+
+            if (accumulator.getInsertedRowCount() == 0) {
+                throw new IllegalArgumentException("저장 가능한 측정 데이터가 없습니다. char_no+axis+nominal/measured_value 매핑을 확인하세요.");
+            }
 
             log.info(
                     "[ExcelParseSave] projId={}, projNum={}, reqLotNo={}, fileName={}, parsedRows={}",
@@ -216,7 +232,7 @@ public class InspectionServiceImpl implements InspectionService {
                     project.getProjNum(),
                     lotNo,
                     fileName,
-                    parsedRows.size());
+                    accumulator.getParsedRowCount());
             log.info(
                     "[ExcelParseSave] config dataStartRow={}, charNoCol={}, axisCol={}, nominalCol={}, uTolCol={}, lTolCol={}, measuredValueCol={}, serialNo={}, inspDt={}",
                     dataStartRow,
@@ -229,10 +245,11 @@ public class InspectionServiceImpl implements InspectionService {
                     serialNo,
                     formatDateTime(inspDt));
 
-            int logLimit = Math.min(parsedRows.size(), LOG_PREVIEW_ROW_LIMIT);
+            List<ExcelParsePreviewRespDto.ParsedRow> previewRows = accumulator.getPreviewRows();
+            int logLimit = Math.min(previewRows.size(), LOG_PREVIEW_ROW_LIMIT);
             for (int i = 0; i < logLimit; i += 1) {
-                ExcelParsePreviewRespDto.ParsedRow row = parsedRows.get(i);
-                log.info(
+                ExcelParsePreviewRespDto.ParsedRow row = previewRows.get(i);
+                log.debug(
                         "[ExcelParseSaveRow] index={}, excelRowNo={}, charNo={}, axis={}, nominal={}, uTol={}, lTol={}, measuredValue={}",
                         i + 1,
                         row.getExcelRowNo(),
@@ -260,61 +277,25 @@ public class InspectionServiceImpl implements InspectionService {
                     .inspDt(formatDateTime(inspDt))
                     .skippedDuplicateSerialNo(false)
                     .skipReason("")
-                    .parsedRowCount(parsedRows.size())
-                    .parsedRows(parsedRows)
+                    .parsedRowCount(accumulator.getParsedRowCount())
+                    .insertedRowCount(accumulator.getInsertedRowCount())
+                    .skippedRowCount(accumulator.getSkippedRowCount())
+                    .parsedRows(previewRows)
                     .build();
         }
     }
 
     private InspectionBatchSaveResult persistBatch(InspectionBatchSaveReqDto request) {
-        List<Characteristic> characteristicList = characteristicRepository
-                .selectCharacteristicListByProjId(request.getProjId())
-                .orElseThrow(() -> new IllegalArgumentException("프로젝트 특성치 정보가 없습니다. projId=" + request.getProjId()));
-
-        if (characteristicList.isEmpty()) {
-            throw new IllegalArgumentException("프로젝트 특성치 정보가 없습니다. projId=" + request.getProjId());
-        }
-
-        CharacteristicLookup lookup = buildCharacteristicLookup(characteristicList);
-
-        List<ParsedSaveTarget> saveTargets = new ArrayList<>();
-        int skippedRowCount = 0;
-        for (InspectionBatchRowReqDto parsedRow : request.getRows()) {
-            ParsedSaveTarget saveTarget = resolveSaveTarget(parsedRow, lookup);
-            if (saveTarget == null) {
-                skippedRowCount += 1;
-                continue;
-            }
-            saveTargets.add(saveTarget);
-        }
-
-        if (saveTargets.isEmpty()) {
+        CharacteristicLookup lookup = loadCharacteristicLookup(request.getProjId());
+        ResolvedSaveTargets resolvedSaveTargets = resolveSaveTargets(request.getRows(), lookup);
+        if (resolvedSaveTargets.getSaveTargets().isEmpty()) {
             throw new IllegalArgumentException("저장 가능한 측정 데이터가 없습니다. char_no+axis+nominal/measured_value 매핑을 확인하세요.");
         }
 
-        InspectionReport inspectionReport = new InspectionReport();
-        inspectionReport.setProjId(request.getProjId());
-        inspectionReport.setSerialNo(request.getSerialNo());
-        inspectionReport.setInspDt(request.getInspDt());
-
-        int insertedReportCount = inspectionReportRepository.insertInspectionReport(inspectionReport);
-        if (insertedReportCount == 0 || inspectionReport.getInspReportId() == null) {
-            throw new RuntimeException("검사 리포트 저장에 실패했습니다.");
-        }
-
-        int insertedDataCount = 0;
-        for (ParsedSaveTarget saveTarget : saveTargets) {
-            InspectionData inspectionData = new InspectionData();
-            inspectionData.setInspReportId(inspectionReport.getInspReportId());
-            inspectionData.setCharId(saveTarget.getCharId());
-            inspectionData.setMeasuredValue(saveTarget.getMeasuredValue());
-
-            int insertedData = inspectionDataRepository.insertInspectionData(inspectionData);
-            if (insertedData == 0) {
-                throw new RuntimeException("측정 데이터 저장에 실패했습니다. excelRowNo=" + saveTarget.getExcelRowNo());
-            }
-            insertedDataCount += insertedData;
-        }
+        InspectionReport inspectionReport = insertInspectionReport(request.getProjId(), request.getSerialNo(), request.getInspDt());
+        InspectionBatchSaveResult saveResult = persistResolvedSaveTargets(
+                inspectionReport.getInspReportId(),
+                resolvedSaveTargets);
 
         log.info(
                 "[ExcelParseSave] persisted reportId={}, projId={}, serialNo={}, inspDt={}, insertedDataCount={}, skippedRowCount={}",
@@ -322,57 +303,103 @@ public class InspectionServiceImpl implements InspectionService {
                 request.getProjId(),
                 request.getSerialNo(),
                 formatDateTime(request.getInspDt()),
-                insertedDataCount,
-                skippedRowCount);
+                saveResult.getInsertedDataCount(),
+                saveResult.getSkippedRowCount());
 
         return new InspectionBatchSaveResult(
                 inspectionReport.getInspReportId(),
-                insertedDataCount,
-                skippedRowCount);
+                saveResult.getInsertedDataCount(),
+                saveResult.getSkippedRowCount());
     }
 
-    private List<ExcelParsePreviewRespDto.ParsedRow> parseRows(
-            Sheet sheet,
-            DataFormatter formatter,
-            int dataStartRow,
-            int charNoCol,
-            int axisCol,
-            int nominalCol,
-            int uTolCol,
-            int lTolCol,
-            int measuredValueCol) {
-        if (sheet == null) {
-            return Collections.emptyList();
+    private void flushParsedRows(
+            Long inspReportId,
+            List<InspectionBatchRowReqDto> batchRows,
+            CharacteristicLookup lookup,
+            StreamingUploadAccumulator accumulator) {
+        if (batchRows.isEmpty()) {
+            return;
         }
 
-        List<ExcelParsePreviewRespDto.ParsedRow> parsedRows = new ArrayList<>();
+        InspectionBatchSaveResult batchSaveResult = persistParsedRows(inspReportId, batchRows, lookup);
+        accumulator.recordInsertedRows(batchSaveResult.getInsertedDataCount());
+        accumulator.recordSkippedRows(batchSaveResult.getSkippedRowCount());
+        batchRows.clear();
+    }
 
-        for (int rowIndex = Math.max(dataStartRow - 1, 0); rowIndex <= sheet.getLastRowNum(); rowIndex += 1) {
-            Row row = sheet.getRow(rowIndex);
+    private InspectionBatchSaveResult persistParsedRows(
+            Long inspReportId,
+            List<InspectionBatchRowReqDto> rows,
+            CharacteristicLookup lookup) {
+        ResolvedSaveTargets resolvedSaveTargets = resolveSaveTargets(rows, lookup);
+        return persistResolvedSaveTargets(inspReportId, resolvedSaveTargets);
+    }
 
-            String charNo = readCellAsString(row, charNoCol, formatter);
-            String axis = readCellAsString(row, axisCol, formatter);
-            Double nominal = readCellAsDouble(row, nominalCol, formatter);
-            Double uTol = readCellAsDouble(row, uTolCol, formatter);
-            Double lTol = readCellAsDouble(row, lTolCol, formatter);
-            Double measuredValue = readCellAsDouble(row, measuredValueCol, formatter);
+    private InspectionBatchSaveResult persistResolvedSaveTargets(
+            Long inspReportId,
+            ResolvedSaveTargets resolvedSaveTargets) {
+        List<ParsedSaveTarget> saveTargets = resolvedSaveTargets.getSaveTargets();
+        if (saveTargets.isEmpty()) {
+            return new InspectionBatchSaveResult(inspReportId, 0, resolvedSaveTargets.getSkippedRowCount());
+        }
 
-            if (isBlank(charNo) && isBlank(axis) && nominal == null && uTol == null && lTol == null && measuredValue == null) {
+        List<InspectionData> inspectionDataList = new ArrayList<>(saveTargets.size());
+        for (ParsedSaveTarget saveTarget : saveTargets) {
+            InspectionData inspectionData = new InspectionData();
+            inspectionData.setInspReportId(inspReportId);
+            inspectionData.setCharId(saveTarget.getCharId());
+            inspectionData.setMeasuredValue(saveTarget.getMeasuredValue());
+            inspectionDataList.add(inspectionData);
+        }
+
+        int insertedDataCount = inspectionDataRepository.insertInspectionDataBatch(inspectionDataList);
+        if (insertedDataCount != inspectionDataList.size()) {
+            Integer failedRowNo = saveTargets.get(0).getExcelRowNo();
+            throw new RuntimeException("측정 데이터 저장에 실패했습니다. excelRowNo=" + failedRowNo);
+        }
+
+        return new InspectionBatchSaveResult(inspReportId, insertedDataCount, resolvedSaveTargets.getSkippedRowCount());
+    }
+
+    private InspectionReport insertInspectionReport(Long projId, String serialNo, LocalDateTime inspDt) {
+        InspectionReport inspectionReport = new InspectionReport();
+        inspectionReport.setProjId(projId);
+        inspectionReport.setSerialNo(serialNo);
+        inspectionReport.setInspDt(inspDt);
+
+        int insertedReportCount = inspectionReportRepository.insertInspectionReport(inspectionReport);
+        if (insertedReportCount == 0 || inspectionReport.getInspReportId() == null) {
+            throw new RuntimeException("검사 리포트 저장에 실패했습니다.");
+        }
+        return inspectionReport;
+    }
+
+    private CharacteristicLookup loadCharacteristicLookup(Long projId) {
+        List<Characteristic> characteristicList = characteristicRepository
+                .selectCharacteristicListByProjId(projId)
+                .orElseThrow(() -> new IllegalArgumentException("프로젝트 특성치 정보가 없습니다. projId=" + projId));
+
+        if (characteristicList.isEmpty()) {
+            throw new IllegalArgumentException("프로젝트 특성치 정보가 없습니다. projId=" + projId);
+        }
+
+        return buildCharacteristicLookup(characteristicList);
+    }
+
+    private ResolvedSaveTargets resolveSaveTargets(
+            List<InspectionBatchRowReqDto> parsedRows,
+            CharacteristicLookup lookup) {
+        List<ParsedSaveTarget> saveTargets = new ArrayList<>();
+        int skippedRowCount = 0;
+        for (InspectionBatchRowReqDto parsedRow : parsedRows) {
+            ParsedSaveTarget saveTarget = resolveSaveTarget(parsedRow, lookup);
+            if (saveTarget == null) {
+                skippedRowCount += 1;
                 continue;
             }
-
-            parsedRows.add(ExcelParsePreviewRespDto.ParsedRow.builder()
-                    .excelRowNo(rowIndex + 1)
-                    .charNo(charNo)
-                    .axis(axis)
-                    .nominal(nominal)
-                    .uTol(uTol)
-                    .lTol(lTol)
-                    .measuredValue(measuredValue)
-                    .build());
+            saveTargets.add(saveTarget);
         }
-
-        return parsedRows;
+        return new ResolvedSaveTargets(saveTargets, skippedRowCount);
     }
 
     private String resolveSerialNo(String sourceJson, String fileName, Sheet sheet, DataFormatter formatter, String lotNo) {
@@ -836,8 +863,7 @@ public class InspectionServiceImpl implements InspectionService {
     }
 
     private boolean isSerialNoDuplicated(String serialNo) {
-        Optional<InspectionReport> duplicatedReport = inspectionReportRepository.selectInspectionReportBySerialNo(serialNo);
-        return duplicatedReport.isPresent();
+        return inspectionReportRepository.existsBySerialNo(serialNo);
     }
 
     private InspectionBatchRowReqDto toBatchRow(ExcelParsePreviewRespDto.ParsedRow parsedRow) {
@@ -1040,6 +1066,24 @@ public class InspectionServiceImpl implements InspectionService {
 
         private int getInsertedDataCount() {
             return insertedDataCount;
+        }
+
+        private int getSkippedRowCount() {
+            return skippedRowCount;
+        }
+    }
+
+    private static class ResolvedSaveTargets {
+        private final List<ParsedSaveTarget> saveTargets;
+        private final int skippedRowCount;
+
+        private ResolvedSaveTargets(List<ParsedSaveTarget> saveTargets, int skippedRowCount) {
+            this.saveTargets = saveTargets;
+            this.skippedRowCount = skippedRowCount;
+        }
+
+        private List<ParsedSaveTarget> getSaveTargets() {
+            return saveTargets;
         }
 
         private int getSkippedRowCount() {

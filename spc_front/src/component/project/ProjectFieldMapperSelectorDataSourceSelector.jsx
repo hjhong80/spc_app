@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, {
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useRef,
+    useState,
+} from 'react';
 import {
     Box,
     TextField,
@@ -46,7 +52,7 @@ const getValidatedTextFieldSx = (isValid) => {
     };
 };
 
-const DataSourceSelector = ({
+const DataSourceSelector = forwardRef(({
     label,
     icon,
     value,
@@ -56,13 +62,39 @@ const DataSourceSelector = ({
     onTouched,
     onCellCoordinateFocus,
     onCellCoordinateDeactivate,
-}) => {
+    onAdvance,
+}, ref) => {
     const touch = () => {
         onTouched?.();
     };
 
     const [sourceType, setSourceType] = useState(
         value?.type || 'filenameRange',
+    );
+    const filenameRangeStartInputRef = useRef(null);
+    const filenameOffsetInputRef = useRef(null);
+    const cellCoordinateInputRef = useRef(null);
+    const pendingFocusTypeRef = useRef(null);
+
+    const focusPrimaryInput = (targetType = sourceType) => {
+        const focusTargets = {
+            filenameRange: filenameRangeStartInputRef,
+            filenameOffset: filenameOffsetInputRef,
+            cellCoordinate: cellCoordinateInputRef,
+        };
+
+        const targetRef = focusTargets[targetType];
+        targetRef?.current?.focus();
+    };
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            focusPrimaryInput: () => {
+                focusPrimaryInput();
+            },
+        }),
+        [sourceType],
     );
 
     useEffect(() => {
@@ -71,14 +103,30 @@ const DataSourceSelector = ({
         }
     }, [sourceType, value?.type]);
 
+    useEffect(() => {
+        if (!pendingFocusTypeRef.current) {
+            return;
+        }
+
+        focusPrimaryInput(pendingFocusTypeRef.current);
+        pendingFocusTypeRef.current = null;
+    }, [sourceType, value?.type]);
+
     const handleSourceTypeChange = (_, newType) => {
         if (newType !== null) {
             touch();
             setSourceType(newType);
             onChange({ type: newType, value: {} });
+            pendingFocusTypeRef.current = newType;
             if (newType !== 'cellCoordinate') {
                 onCellCoordinateDeactivate?.();
             }
+        }
+    };
+
+    const handleSourceTypeButtonClick = (targetType) => {
+        if (sourceType === targetType) {
+            focusPrimaryInput(targetType);
         }
     };
 
@@ -88,6 +136,37 @@ const DataSourceSelector = ({
             type: sourceType,
             value: { ...value?.value, [field]: val },
         });
+    };
+
+    const maybeAdvanceToNextField = (overrideValue = {}) => {
+        const nextValue = { ...(value?.value || {}), ...overrideValue };
+
+        if (sourceType === 'filenameRange') {
+            const start = parseInt(nextValue.start, 10);
+            const end = parseInt(nextValue.end, 10);
+            if (
+                Number.isInteger(start) &&
+                Number.isInteger(end) &&
+                start >= 1 &&
+                end >= start
+            ) {
+                onAdvance?.();
+            }
+            return;
+        }
+
+        if (sourceType === 'filenameOffset') {
+            const offset = parseInt(nextValue.offset, 10);
+            const length = parseInt(nextValue.length, 10);
+            if (
+                Number.isInteger(offset) &&
+                Number.isInteger(length) &&
+                offset >= 1 &&
+                length >= 1
+            ) {
+                onAdvance?.();
+            }
+        }
     };
 
     // 파일명에서 하이라이트 미리보기 생성
@@ -217,17 +296,26 @@ const DataSourceSelector = ({
                     },
                 }}
             >
-                <ToggleButton value="filenameRange">
+                <ToggleButton
+                    value="filenameRange"
+                    onClick={() => handleSourceTypeButtonClick('filenameRange')}
+                >
                     <Tooltip title="파일명에서 시작~끝 위치">
                         <span>파일명</span>
                     </Tooltip>
                 </ToggleButton>
-                <ToggleButton value="filenameOffset">
+                <ToggleButton
+                    value="filenameOffset"
+                    onClick={() => handleSourceTypeButtonClick('filenameOffset')}
+                >
                     <Tooltip title="확장자 기준 오프셋">
                         <span>확장자</span>
                     </Tooltip>
                 </ToggleButton>
-                <ToggleButton value="cellCoordinate">
+                <ToggleButton
+                    value="cellCoordinate"
+                    onClick={() => handleSourceTypeButtonClick('cellCoordinate')}
+                >
                     <Tooltip title="엑셀 셀 좌표">
                         <span>셀</span>
                     </Tooltip>
@@ -254,6 +342,7 @@ const DataSourceSelector = ({
             {sourceType === 'filenameRange' && (
                 <Stack direction="row" spacing={0.5} alignItems="center">
                     <TextField
+                        inputRef={filenameRangeStartInputRef}
                         size="small"
                         type="number"
                         placeholder="시작"
@@ -284,7 +373,10 @@ const DataSourceSelector = ({
                             handleValueChange('end', e.target.value)
                         }
                         inputProps={{ min: 1 }}
-                        onBlur={touch}
+                        onBlur={(e) => {
+                            touch();
+                            maybeAdvanceToNextField({ end: e.target.value });
+                        }}
                         sx={{
                             ...getValidatedTextFieldSx(validationState),
                             flex: 1,
@@ -300,6 +392,7 @@ const DataSourceSelector = ({
             {sourceType === 'filenameOffset' && (
                 <Stack direction="row" spacing={0.5}>
                     <TextField
+                        inputRef={filenameOffsetInputRef}
                         size="small"
                         type="number"
                         placeholder="거리"
@@ -327,7 +420,10 @@ const DataSourceSelector = ({
                             handleValueChange('length', e.target.value)
                         }
                         inputProps={{ min: 1 }}
-                        onBlur={touch}
+                        onBlur={(e) => {
+                            touch();
+                            maybeAdvanceToNextField({ length: e.target.value });
+                        }}
                         sx={{
                             ...getValidatedTextFieldSx(validationState),
                             flex: 1,
@@ -343,6 +439,7 @@ const DataSourceSelector = ({
             {sourceType === 'cellCoordinate' && (
                 <Box>
                     <TextField
+                        inputRef={cellCoordinateInputRef}
                         size="small"
                         placeholder="예: B6,B7 또는 B6~B7 또는 B6-B7"
                         value={value?.value?.cell || ''}
@@ -371,6 +468,6 @@ const DataSourceSelector = ({
             )}
         </Box>
     );
-};
+});
 
 export default DataSourceSelector;

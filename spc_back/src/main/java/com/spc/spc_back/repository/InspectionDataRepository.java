@@ -23,6 +23,10 @@ public class InspectionDataRepository {
         return inspectionDataMapper.insertInspectionData(inspectionData);
     }
 
+    public int insertInspectionDataBatch(List<InspectionData> inspectionDataList) {
+        return inspectionDataMapper.insertInspectionDataBatch(inspectionDataList);
+    }
+
     public Optional<List<InspectionData>> selectInspectionDataListByInspReportId(Long inspReportId) {
         return Optional.ofNullable(inspectionDataMapper.selectInspectionDataListByInspReportId(inspReportId));
     }

@@ -27,6 +27,10 @@ public class InspectionReportRepository {
         return Optional.ofNullable(inspectionReportMapper.selectInspectionReportBySerialNo(serialNo));
     }
 
+    public boolean existsBySerialNo(String serialNo) {
+        return inspectionReportMapper.existsBySerialNo(serialNo);
+    }
+
     public Optional<List<InspectionReport>> selectInspectionReportListByProjId(Long projId) {
         return Optional.ofNullable(inspectionReportMapper.selectInspectionReportListByProjId(projId));
     }

@@ -21,6 +21,8 @@ export interface ExcelParsePreviewRespDto {
     skippedDuplicateSerialNo?: boolean;
     skipReason?: string;
     parsedRowCount?: number;
+    insertedRowCount?: number;
+    skippedRowCount?: number;
     parsedRows?: ParsedRow[];
     ltolCol?: string;
     utolCol?: string;

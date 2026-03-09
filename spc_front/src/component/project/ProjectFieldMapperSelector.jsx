@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     Box,
     TextField,
@@ -14,6 +14,7 @@ import TagIcon from '@mui/icons-material/Tag';
 import DataSourceSelector from './ProjectFieldMapperSelectorDataSourceSelector';
 import {
     getColumnLetter,
+    parseColumnInput,
     parseCellCoordinateExpression,
 } from '../../utils/fieldMapperParser';
 
@@ -85,6 +86,20 @@ const isOptionalMappedColumn = (inputValue, columnIndex) => {
         return true;
     }
     return isMappedColumn(columnIndex);
+};
+
+const NEXT_FOCUS_FIELD_KEY = {
+    projectName: 'projectNumber',
+    projectNumber: 'serialNumberSource',
+    serialNumberSource: 'measurementTimeSource',
+    measurementTimeSource: 'dataStartRow',
+    dataStartRow: 'characteristicNo',
+    characteristicNo: 'axis',
+    axis: 'nominal',
+    nominal: 'measuredValue',
+    measuredValue: 'upperTolerance',
+    upperTolerance: 'lowerTolerance',
+    lowerTolerance: null,
 };
 
 const isValidDataSource = (sourceConfig) => {
@@ -164,6 +179,12 @@ const FieldMapper = ({
     successNoticeMessage = '',
 }) => {
     const [focusedFieldKey, setFocusedFieldKey] = useState(null);
+    const projectNameInputRef = useRef(null);
+    const projectNumberInputRef = useRef(null);
+    const serialNumberSourceRef = useRef(null);
+    const measurementTimeSourceRef = useRef(null);
+    const dataStartRowInputRef = useRef(null);
+    const fieldInputRefs = useRef({});
     const [touched, setTouched] = useState({
         projectName: false,
         projectNumber: false,
@@ -227,6 +248,71 @@ const FieldMapper = ({
     const isApplyButtonDisabled = isApplyDisabled || !isRequiredInputsValid;
     const activateSelectionTarget = (target) => {
         onSelectionTargetChange?.(target);
+    };
+
+    const focusTargetByKey = (fieldKey) => {
+        if (!fieldKey) {
+            return;
+        }
+
+        const focusMap = {
+            projectName: projectNameInputRef,
+            projectNumber: projectNumberInputRef,
+            serialNumberSource: serialNumberSourceRef,
+            measurementTimeSource: measurementTimeSourceRef,
+            dataStartRow: dataStartRowInputRef,
+        };
+
+        if (fieldKey === 'serialNumberSource' || fieldKey === 'measurementTimeSource') {
+            focusMap[fieldKey]?.current?.focusPrimaryInput?.();
+            return;
+        }
+
+        if (focusMap[fieldKey]?.current) {
+            focusMap[fieldKey].current.focus();
+            return;
+        }
+
+        fieldInputRefs.current[fieldKey]?.focus?.();
+    };
+
+    const advanceFocusIfNeeded = (fieldKey, rawValue) => {
+        const nextFieldKey = NEXT_FOCUS_FIELD_KEY[fieldKey];
+        if (!nextFieldKey) {
+            return;
+        }
+
+        const trimmedValue = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue ?? '').trim();
+
+        if (fieldKey === 'axis') {
+            if (trimmedValue.length > 0 && parseColumnInput(trimmedValue) === null) {
+                return;
+            }
+            focusTargetByKey(nextFieldKey);
+            return;
+        }
+
+        if (fieldKey === 'dataStartRow') {
+            if (!isPositiveInteger(rawValue)) {
+                return;
+            }
+            focusTargetByKey(nextFieldKey);
+            return;
+        }
+
+        if (fieldKey === 'projectName' || fieldKey === 'projectNumber') {
+            if (!isNonEmptyString(trimmedValue)) {
+                return;
+            }
+            focusTargetByKey(nextFieldKey);
+            return;
+        }
+
+        if (parseColumnInput(trimmedValue) === null) {
+            return;
+        }
+
+        focusTargetByKey(nextFieldKey);
     };
 
     return (
@@ -357,6 +443,7 @@ const FieldMapper = ({
                             제품명(프로젝트명)
                         </Typography>
                         <TextField
+                            inputRef={projectNameInputRef}
                             size="medium"
                             placeholder="제품명"
                             value={projectName || ''}
@@ -370,7 +457,10 @@ const FieldMapper = ({
                                     fieldKey: 'projectName',
                                 })
                             }
-                            onBlur={() => markTouched('projectName')}
+                            onBlur={(e) => {
+                                markTouched('projectName');
+                                advanceFocusIfNeeded('projectName', e.target.value);
+                            }}
                             fullWidth
                             sx={getValidatedTextFieldSx(getValidationState('projectName'))}
                         />
@@ -390,6 +480,7 @@ const FieldMapper = ({
                             도면 번호
                         </Typography>
                         <TextField
+                            inputRef={projectNumberInputRef}
                             size="medium"
                             placeholder="도면 번호"
                             value={projectNumber || ''}
@@ -403,7 +494,10 @@ const FieldMapper = ({
                                     fieldKey: 'projectNumber',
                                 })
                             }
-                            onBlur={() => markTouched('projectNumber')}
+                            onBlur={(e) => {
+                                markTouched('projectNumber');
+                                advanceFocusIfNeeded('projectNumber', e.target.value);
+                            }}
                             fullWidth
                             sx={getValidatedTextFieldSx(getValidationState('projectNumber'))}
                         />
@@ -411,6 +505,7 @@ const FieldMapper = ({
 
                     {/* 시리얼 번호 */}
                     <DataSourceSelector
+                        ref={serialNumberSourceRef}
                         label="시리얼 번호"
                         icon={<TagIcon sx={{ fontSize: 20, color: '#1976d2' }} />}
                         value={serialNumberSource}
@@ -427,10 +522,12 @@ const FieldMapper = ({
                         onCellCoordinateDeactivate={() =>
                             activateSelectionTarget(null)
                         }
+                        onAdvance={() => focusTargetByKey('measurementTimeSource')}
                     />
 
                     {/* 측정 시간 */}
                     <DataSourceSelector
+                        ref={measurementTimeSourceRef}
                         label="측정 시간"
                         icon={
                             <AccessTimeIcon
@@ -451,6 +548,7 @@ const FieldMapper = ({
                         onCellCoordinateDeactivate={() =>
                             activateSelectionTarget(null)
                         }
+                        onAdvance={() => focusTargetByKey('dataStartRow')}
                     />
                 </Box>
 
@@ -478,6 +576,7 @@ const FieldMapper = ({
                             데이터 시작 행(헤더 제외)
                         </Typography>
                         <TextField
+                            inputRef={dataStartRowInputRef}
                             size="medium"
                             value={dataStartRow}
                             onChange={(e) => {
@@ -496,7 +595,10 @@ const FieldMapper = ({
                                     e.preventDefault();
                                 }
                             }}
-                            onBlur={() => markTouched('dataStartRow')}
+                            onBlur={(e) => {
+                                markTouched('dataStartRow');
+                                advanceFocusIfNeeded('dataStartRow', e.target.value);
+                            }}
                             inputProps={{
                                 inputMode: 'numeric',
                                 pattern: '[0-9]*',
@@ -547,6 +649,9 @@ const FieldMapper = ({
                                     </Typography>
                                 </Box>
                                 <TextField
+                                    inputRef={(node) => {
+                                        fieldInputRefs.current[field.key] = node;
+                                    }}
                                     size="small"
                                     placeholder="A, B 또는 1"
                                     value={fieldInputs[field.key] || ''}
@@ -565,9 +670,13 @@ const FieldMapper = ({
                                             });
                                         }
                                     }
-                                    onBlur={() => {
+                                    onBlur={(e) => {
                                         setFocusedFieldKey((prev) =>
                                             prev === field.key ? null : prev,
+                                        );
+                                        advanceFocusIfNeeded(
+                                            field.key,
+                                            e.target.value,
                                         );
                                     }}
                                     fullWidth

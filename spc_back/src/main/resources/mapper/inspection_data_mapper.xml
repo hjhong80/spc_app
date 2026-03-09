@@ -31,6 +31,16 @@
             (#{inspReportId}, #{charId}, #{measuredValue})
     </insert>
 
+    <insert id="insertInspectionDataBatch">
+        INSERT INTO
+            insp_data_tb
+            (insp_report_id, char_id, measured_value)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.inspReportId}, #{item.charId}, #{item.measuredValue})
+        </foreach>
+    </insert>
+
     <select id="selectInspectionDataListByInspReportId" resultMap="inspectionDataResultMap">
         SELECT
             idt.insp_data_id,
