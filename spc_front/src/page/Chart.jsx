@@ -11,6 +11,7 @@ import {
     Alert,
     Badge,
     Box,
+    Button,
     Chip,
     IconButton,
     Popover,
@@ -25,6 +26,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import DetailCharacteristicChart from '../component/chart/DetailCharacteristicChart';
 import MainCharacteristicChart from '../component/chart/MainCharacteristicChart';
 import ChartFloatingNotification from '../component/chart/ChartFloatingNotification';
+import SerialReportDetailModal from '../component/chart/SerialReportDetailModal';
+import SerialSearchDialog from '../component/chart/SerialSearchDialog';
 import { customInstance } from '../apis/custom-instance';
 import { navigateBackOrFallback } from '../utils/navigation';
 import {
@@ -34,6 +37,7 @@ import {
     toInputDateValue,
     toInputMonthValue,
 } from '../utils/chartDate';
+import useDebounce from '../utils/useDebounce';
 import UnifiedHeaderBar from '../component/common/UnifiedHeaderBar';
 import { buildMainChartSlots, buildSlotLabelMap } from '../features/chart/chartDownsampling';
 import { buildMainBarSeriesData, calculateChartWidthRatio } from '../features/chart/chartSeriesBuilder';
@@ -64,6 +68,11 @@ import {
     shouldResetChartNotificationsForContextChange,
     shouldUseFloatingChartNotification,
 } from './chartNotifications';
+import {
+    collectSerialSearchCandidates,
+    findExactSerialSearchCandidate,
+    normalizeSerialSearchKeyword,
+} from './chartSerialSearch';
 
 const SIGMA_MULTIPLIER = 2;
 const Y_AXIS_LINEAR_PERCENT_LIMIT = 100;
@@ -1517,6 +1526,16 @@ const Chart = () => {
     const [detailTimelineData, setDetailTimelineData] = useState([]);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
     const [detailErrorMessage, setDetailErrorMessage] = useState('');
+    const [selectedSerialNo, setSelectedSerialNo] = useState('');
+    const [serialDetailRows, setSerialDetailRows] = useState([]);
+    const [isSerialDetailLoading, setIsSerialDetailLoading] = useState(false);
+    const [isSerialDetailModalOpen, setIsSerialDetailModalOpen] = useState(false);
+    const [isSerialSearchDialogOpen, setIsSerialSearchDialogOpen] = useState(false);
+    const [serialSearchKeyword, setSerialSearchKeyword] = useState('');
+    const [serialSearchCandidates, setSerialSearchCandidates] = useState([]);
+    const [isSerialSearchLoading, setIsSerialSearchLoading] = useState(false);
+    const [serialSearchStatusMessage, setSerialSearchStatusMessage] = useState('');
+    const [serialSearchStatusSeverity, setSerialSearchStatusSeverity] = useState('info');
     const [detailDistributionData, setDetailDistributionData] = useState(null);
     const [isDetailDistributionLoading, setIsDetailDistributionLoading] = useState(false);
     const [detailDistributionErrorMessage, setDetailDistributionErrorMessage] = useState('');
@@ -1524,6 +1543,7 @@ const Chart = () => {
     const detailDistributionComputationCacheRef = useRef(new Map());
     const detailDistributionPerfRef = useRef(null);
     const detailPerfAnchorRef = useRef(null);
+    const lastAutoSearchedSerialRef = useRef('');
     const lastBackendStatusMessageRef = useRef('');
     const lastBackendErrorMessageRef = useRef('');
     const lastDetailNoiseWarningMessageRef = useRef('');
@@ -1613,6 +1633,102 @@ const Chart = () => {
         setInfoAnchorEl(null);
         setIsInfoSnackbarOpen(false);
     };
+
+    const handleSerialDetailModalClose = useCallback(() => {
+        setIsSerialDetailModalOpen(false);
+        setIsSerialDetailLoading(false);
+    }, []);
+
+    const setSerialSearchStatus = useCallback((message, severity = 'info') => {
+        setSerialSearchStatusMessage(message);
+        setSerialSearchStatusSeverity(severity);
+    }, []);
+
+    const handleSerialSearchDialogOpen = useCallback(() => {
+        setIsSerialSearchDialogOpen(true);
+        setSerialSearchKeyword('');
+        setSerialSearchCandidates([]);
+        setIsSerialSearchLoading(false);
+        setSerialSearchStatus('', 'info');
+        lastAutoSearchedSerialRef.current = '';
+    }, [setSerialSearchStatus]);
+
+    const handleSerialSearchDialogClose = useCallback(() => {
+        setIsSerialSearchDialogOpen(false);
+        setSerialSearchCandidates([]);
+        setIsSerialSearchLoading(false);
+        setSerialSearchStatus('', 'info');
+        lastAutoSearchedSerialRef.current = '';
+    }, [setSerialSearchStatus]);
+
+    const handleSerialSearchKeywordChange = useCallback(
+        (nextValue) => {
+            setSerialSearchKeyword(nextValue);
+            setSerialSearchCandidates([]);
+            setIsSerialSearchLoading(false);
+            setSerialSearchStatus('', 'info');
+        },
+        [setSerialSearchStatus],
+    );
+
+    const openSerialDetailModal = useCallback(
+        async (meta) => {
+            const serialNo = resolveTooltipSerialNo(meta);
+
+            if (!serialNo) {
+                pushChartNotification(
+                    CHART_NOTIFICATION_SEVERITY.WARNING,
+                    'serialNo가 없어 성적서 상세를 조회할 수 없습니다.',
+                    {
+                        source: 'serial-detail-missing-serial',
+                        openSnackbar: true,
+                    },
+                );
+                return;
+            }
+
+            if (isSerialDetailLoading) {
+                return;
+            }
+
+            setSelectedSerialNo(serialNo);
+            setSerialDetailRows([]);
+            setIsSerialDetailModalOpen(true);
+            setIsSerialDetailLoading(true);
+
+            try {
+                const response = await customInstance(
+                    `/spcdata/report/serial/${encodeURIComponent(serialNo)}/details`,
+                    { method: 'GET' },
+                );
+                const body = response?.data;
+
+                if (body?.status !== 'success') {
+                    throw new Error(body?.message || '성적서 상세를 불러오지 못했습니다.');
+                }
+
+                setSerialDetailRows(Array.isArray(body?.data) ? body.data : []);
+            } catch (error) {
+                setIsSerialDetailModalOpen(false);
+                setSerialDetailRows([]);
+                pushChartNotification(
+                    CHART_NOTIFICATION_SEVERITY.WARNING,
+                    error?.response?.data?.message ||
+                        error?.message ||
+                        '성적서 상세를 불러오는 중 오류가 발생했습니다.',
+                    {
+                        source: 'serial-detail-fetch-failed',
+                        openSnackbar: true,
+                    },
+                );
+            } finally {
+                setIsSerialDetailLoading(false);
+            }
+        },
+        [isSerialDetailLoading, pushChartNotification],
+    );
+
+    const debouncedSerialSearchKeyword = useDebounce(serialSearchKeyword, 300);
 
     const chartNotificationContextKey = useMemo(
         () =>
@@ -2440,6 +2556,206 @@ const Chart = () => {
         [detailScale, detailTimelineData, selectedCharacteristic],
     );
 
+    const openSerialSearchResult = useCallback(
+        async (rawSerialNo) => {
+            const normalizedSerialNo = normalizeSerialSearchKeyword(rawSerialNo);
+
+            if (!normalizedSerialNo) {
+                setSerialSearchStatus('serialNo를 입력하세요.', 'warning');
+                return;
+            }
+
+            const localExactMatch =
+                activeChartView === 'detail' && detailScale === DETAIL_SCALE_DAY
+                    ? detailChartData.find(
+                          (item) =>
+                              resolveTooltipSerialNo(item?.meta).toLowerCase() ===
+                              normalizedSerialNo.toLowerCase(),
+                      ) ?? null
+                    : null;
+
+            if (localExactMatch) {
+                setSerialSearchStatus('', 'info');
+                setIsSerialSearchDialogOpen(false);
+                await openSerialDetailModal(localExactMatch.meta);
+                return;
+            }
+
+            try {
+                setSerialSearchStatus('', 'info');
+                setIsSerialSearchDialogOpen(false);
+                await openSerialDetailModal({
+                    serialNo: normalizedSerialNo,
+                });
+            } catch (error) {
+                const message =
+                    error?.response?.data?.message ||
+                    error?.message ||
+                    '검색 결과가 없습니다.';
+                if (message.includes('검색 결과가 없습니다')) {
+                    setSerialSearchStatus('검색 결과가 없습니다.', 'warning');
+                    return;
+                }
+                setSerialSearchStatus(message, 'warning');
+            }
+        },
+        [
+            activeChartView,
+            detailChartData,
+            detailScale,
+            openSerialDetailModal,
+            setSerialSearchStatus,
+        ],
+    );
+
+    useEffect(() => {
+        if (!isSerialSearchDialogOpen) {
+            lastAutoSearchedSerialRef.current = '';
+            setSerialSearchCandidates([]);
+            setIsSerialSearchLoading(false);
+            return;
+        }
+
+        const normalizedKeyword = normalizeSerialSearchKeyword(debouncedSerialSearchKeyword);
+        if (!normalizedKeyword) {
+            lastAutoSearchedSerialRef.current = '';
+            setSerialSearchCandidates([]);
+            setIsSerialSearchLoading(false);
+            setSerialSearchStatus('', 'info');
+            return;
+        }
+
+        if (lastAutoSearchedSerialRef.current === normalizedKeyword) {
+            return;
+        }
+
+        lastAutoSearchedSerialRef.current = normalizedKeyword;
+        let cancelled = false;
+
+        const loadSerialSearchCandidates = async () => {
+            if (activeChartView === 'detail' && detailScale === DETAIL_SCALE_DAY) {
+                const localCandidates = collectSerialSearchCandidates(
+                    detailChartData,
+                    normalizedKeyword,
+                );
+                if (!cancelled && localCandidates.length > 0) {
+                    setSerialSearchCandidates(localCandidates);
+                    setIsSerialSearchLoading(false);
+                    setSerialSearchStatus('', 'info');
+                }
+                if (localCandidates.length > 0) {
+                    return;
+                }
+            }
+
+            const currentProjectId = toFiniteNumber(project?.projId);
+            if (currentProjectId === null) {
+                if (!cancelled) {
+                    setSerialSearchCandidates([]);
+                    setIsSerialSearchLoading(false);
+                    setSerialSearchStatus('프로젝트 정보를 확인할 수 없습니다.', 'warning');
+                }
+                return;
+            }
+
+            if (!cancelled) {
+                setIsSerialSearchLoading(true);
+            }
+
+            try {
+                const response = await customInstance(
+                    `/spcdata/report/project/${encodeURIComponent(currentProjectId)}/serial-search`,
+                    {
+                        method: 'GET',
+                        params: {
+                            keyword: normalizedKeyword,
+                            limit: 8,
+                        },
+                    },
+                );
+                const body = response?.data;
+                if (body?.status !== 'success') {
+                    throw new Error(body?.message || '검색 결과가 없습니다.');
+                }
+
+                const candidates = Array.isArray(body?.data) ? body.data : [];
+                if (!cancelled) {
+                    setSerialSearchCandidates(candidates);
+                    setSerialSearchStatus(
+                        candidates.length === 0 ? '검색 결과가 없습니다.' : '',
+                        candidates.length === 0 ? 'warning' : 'info',
+                    );
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setSerialSearchCandidates([]);
+                    setSerialSearchStatus(
+                        error?.response?.data?.message ||
+                            error?.message ||
+                            '검색 결과가 없습니다.',
+                        'warning',
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsSerialSearchLoading(false);
+                }
+            }
+        };
+
+        loadSerialSearchCandidates();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        activeChartView,
+        debouncedSerialSearchKeyword,
+        detailChartData,
+        detailScale,
+        isSerialSearchDialogOpen,
+        project?.projId,
+        setSerialSearchStatus,
+    ]);
+
+    const handleSerialSearchSubmit = useCallback(() => {
+        const normalizedKeyword = normalizeSerialSearchKeyword(serialSearchKeyword);
+        lastAutoSearchedSerialRef.current = normalizedKeyword;
+        const exactCandidate = findExactSerialSearchCandidate(
+            serialSearchCandidates,
+            normalizedKeyword,
+        );
+
+        if (exactCandidate) {
+            openSerialSearchResult(exactCandidate.serialNo);
+            return;
+        }
+
+        if (serialSearchCandidates.length === 1) {
+            openSerialSearchResult(serialSearchCandidates[0].serialNo);
+            return;
+        }
+
+        if (serialSearchCandidates.length > 1) {
+            setSerialSearchStatus('후보 목록에서 선택하세요.', 'info');
+            return;
+        }
+
+        openSerialSearchResult(normalizedKeyword);
+    }, [
+        openSerialSearchResult,
+        serialSearchCandidates,
+        serialSearchKeyword,
+        setSerialSearchStatus,
+    ]);
+
+    const handleSerialSearchCandidateSelect = useCallback(
+        (candidate) => {
+            openSerialSearchResult(candidate?.serialNo);
+        },
+        [openSerialSearchResult],
+    );
+
     const detailPlotPoints = useMemo(
         () =>
             detailChartData.map((item) => {
@@ -2963,43 +3279,93 @@ const Chart = () => {
 
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.7 }}>
-                <Box ref={detailPerfAnchorRef}>
-                    <ToggleButtonGroup
+                <Box
+                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.75 }}
+                >
+                    <Button
                         size="small"
-                        exclusive
-                        value={detailVisualMode}
-                        onChange={(_, nextValue) => {
-                            if (nextValue) {
-                                startTransition(() => {
-                                    setDetailVisualMode(nextValue);
-                                });
-                            }
-                        }}
+                        variant="outlined"
+                        onClick={handleSerialSearchDialogOpen}
                         sx={{
-                            '& .MuiToggleButton-root': {
-                                borderColor: 'rgba(163,163,163,0.2)',
-                                color: '#cfcfcf',
-                                px: 1,
-                                py: 0.35,
-                                minHeight: 28,
-                                minWidth: 92,
-                                bgcolor: 'rgba(33,36,41,0.9)',
-                                textTransform: 'none',
-                                justifyContent: 'center',
-                            },
-                            '& .Mui-selected': {
-                                bgcolor: 'rgba(45,140,255,0.18) !important',
-                                color: '#8ec5ff',
-                            },
+                            borderColor: 'rgba(163,163,163,0.2)',
+                            color: '#cfcfcf',
+                            px: 1.2,
+                            py: 0.35,
+                            minHeight: 28,
+                            bgcolor: 'rgba(33,36,41,0.9)',
+                            textTransform: 'none',
                         }}
                     >
-                        <ToggleButton value={DETAIL_VISUAL_BASE}>{baseLabel}</ToggleButton>
-                        <ToggleButton value={DETAIL_VISUAL_DISTRIBUTION}>정규 분포</ToggleButton>
-                    </ToggleButtonGroup>
+                        시리얼 검색
+                    </Button>
+                    <Box ref={detailPerfAnchorRef}>
+                        <ToggleButtonGroup
+                            size="small"
+                            exclusive
+                            value={detailVisualMode}
+                            onChange={(_, nextValue) => {
+                                if (nextValue) {
+                                    startTransition(() => {
+                                        setDetailVisualMode(nextValue);
+                                    });
+                                }
+                            }}
+                            sx={{
+                                '& .MuiToggleButton-root': {
+                                    borderColor: 'rgba(163,163,163,0.2)',
+                                    color: '#cfcfcf',
+                                    px: 1,
+                                    py: 0.35,
+                                    minHeight: 28,
+                                    minWidth: 92,
+                                    bgcolor: 'rgba(33,36,41,0.9)',
+                                    textTransform: 'none',
+                                    justifyContent: 'center',
+                                },
+                                '& .Mui-selected': {
+                                    bgcolor: 'rgba(45,140,255,0.18) !important',
+                                    color: '#8ec5ff',
+                                },
+                            }}
+                        >
+                            <ToggleButton value={DETAIL_VISUAL_BASE}>{baseLabel}</ToggleButton>
+                            <ToggleButton value={DETAIL_VISUAL_DISTRIBUTION}>정규 분포</ToggleButton>
+                        </ToggleButtonGroup>
+                    </Box>
                 </Box>
             </Box>
         );
-    }, [detailScale, detailVisualMode]);
+    }, [detailScale, detailVisualMode, handleSerialSearchDialogOpen]);
+
+    const mainSearchOverlayControls = useMemo(() => {
+        return (
+            <Box
+                sx={{
+                    position: 'absolute',
+                    top: 16,
+                    right: 18,
+                    zIndex: 5,
+                }}
+            >
+                <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleSerialSearchDialogOpen}
+                    sx={{
+                        borderColor: 'rgba(163,163,163,0.2)',
+                        color: '#cfcfcf',
+                        px: 1.2,
+                        py: 0.35,
+                        minHeight: 28,
+                        bgcolor: 'rgba(33,36,41,0.9)',
+                        textTransform: 'none',
+                    }}
+                >
+                    시리얼 검색
+                </Button>
+            </Box>
+        );
+    }, [handleSerialSearchDialogOpen]);
 
     const detailOptions = useMemo(() => {
         if (isDetailDistributionChart) {
@@ -3279,10 +3645,6 @@ const Chart = () => {
                             return;
                         }
 
-                        if (detailScale !== DETAIL_SCALE_MONTH) {
-                            return;
-                        }
-
                         const nextIndex = Number(config?.dataPointIndex);
                         if (!Number.isInteger(nextIndex) || nextIndex < 0) {
                             return;
@@ -3290,18 +3652,29 @@ const Chart = () => {
 
                         const nextPoint = detailPaddedSlots[nextIndex]?.point;
                         const nextMeta = nextPoint?.meta;
-                        const nextBaseDate =
-                            nextMeta?.bucketDate ?? nextMeta?.bucketDateTime ?? '';
-                        const nextDate = toInputDateValue(nextBaseDate);
-                        const nextMonth = toInputMonthValue(nextBaseDate);
-
-                        if (!nextMeta || !nextDate) {
+                        if (!nextMeta) {
                             return;
                         }
 
-                        setSelectedMonth(nextMonth);
-                        setSelectedDate(nextDate);
-                        setDetailScale(DETAIL_SCALE_DAY);
+                        if (detailScale === DETAIL_SCALE_MONTH) {
+                            const nextBaseDate =
+                                nextMeta?.bucketDate ?? nextMeta?.bucketDateTime ?? '';
+                            const nextDate = toInputDateValue(nextBaseDate);
+                            const nextMonth = toInputMonthValue(nextBaseDate);
+
+                            if (!nextDate) {
+                                return;
+                            }
+
+                            setSelectedMonth(nextMonth);
+                            setSelectedDate(nextDate);
+                            setDetailScale(DETAIL_SCALE_DAY);
+                            return;
+                        }
+
+                        if (detailScale === DETAIL_SCALE_DAY) {
+                            openSerialDetailModal(nextMeta);
+                        }
                     },
                 },
             },
@@ -3450,6 +3823,7 @@ const Chart = () => {
         isDetailDayChart,
         isDetailDistributionChart,
         isDetailOneSidedUpperTolerance,
+        openSerialDetailModal,
         projectReportCountLabel,
     ]);
 
@@ -3824,12 +4198,24 @@ const Chart = () => {
                         onBack={handleBack}
                     />
                 ) : (
-                    <MainCharacteristicChart
-                        chartWidthRatio={chartWidthRatio}
-                        options={options}
-                        series={series}
-                        yAxisHoverTooltipResolver={formatMainChartExpectedDefectRateTooltip}
-                    />
+                    <Box
+                        sx={{
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            flex: 1,
+                            minHeight: 0,
+                            minWidth: 0,
+                        }}
+                    >
+                        {mainSearchOverlayControls}
+                        <MainCharacteristicChart
+                            chartWidthRatio={chartWidthRatio}
+                            options={options}
+                            series={series}
+                            yAxisHoverTooltipResolver={formatMainChartExpectedDefectRateTooltip}
+                        />
+                    </Box>
                 )}
             </Box>
 
@@ -4031,6 +4417,26 @@ const Chart = () => {
                     </Box>
                 </Alert>
             </Popover>
+
+            <SerialReportDetailModal
+                open={isSerialDetailModalOpen}
+                serialNo={selectedSerialNo}
+                rows={serialDetailRows}
+                isLoading={isSerialDetailLoading}
+                onClose={handleSerialDetailModalClose}
+            />
+            <SerialSearchDialog
+                open={isSerialSearchDialogOpen}
+                value={serialSearchKeyword}
+                candidates={serialSearchCandidates}
+                isLoading={isSerialSearchLoading}
+                statusMessage={serialSearchStatusMessage}
+                statusSeverity={serialSearchStatusSeverity}
+                onChange={handleSerialSearchKeywordChange}
+                onSelectCandidate={handleSerialSearchCandidateSelect}
+                onSubmit={handleSerialSearchSubmit}
+                onClose={handleSerialSearchDialogClose}
+            />
         </Box>
     );
 };

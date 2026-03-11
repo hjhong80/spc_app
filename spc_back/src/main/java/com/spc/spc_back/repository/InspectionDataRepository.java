@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import com.spc.spc_back.dto.spcdata.ChartDetailSourceDto;
 import com.spc.spc_back.dto.spcdata.ChartDistributionSourceDto;
 import com.spc.spc_back.dto.spcdata.ChartStatRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportDetailRespDto;
 import com.spc.spc_back.entity.spcdata.InspectionData;
 import com.spc.spc_back.mapper.InspectionDataMapper;
 
@@ -33,6 +34,10 @@ public class InspectionDataRepository {
 
     public Optional<List<InspectionData>> selectInspectionDataListByCharId(Long charId) {
         return Optional.ofNullable(inspectionDataMapper.selectInspectionDataListByCharId(charId));
+    }
+
+    public Optional<List<SerialReportDetailRespDto>> selectSerialReportDetailsBySerialNo(String serialNo) {
+        return Optional.ofNullable(inspectionDataMapper.selectSerialReportDetailsBySerialNo(serialNo));
     }
 
     public Optional<ChartDistributionSourceDto> selectDistributionMetaByProjIdAndCharId(Long projId, Long charId) {

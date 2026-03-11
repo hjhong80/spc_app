@@ -89,6 +89,26 @@
             idt.insp_data_id
     </select>
 
+    <select id="selectSerialReportDetailsBySerialNo" resultType="com.spc.spc_back.dto.spcdata.SerialReportDetailRespDto">
+        SELECT
+            ct.char_no as charNo,
+            ct.axis as axis,
+            ct.nominal as nominal,
+            ct.u_tol as uTol,
+            ct.l_tol as lTol,
+            idt.measured_value as measuredValue,
+            irt.create_dt as createDt,
+            irt.update_dt as updateDt
+        FROM
+            insp_report_tb irt
+            INNER JOIN insp_data_tb idt ON idt.insp_report_id = irt.insp_report_id
+            INNER JOIN char_tb ct ON ct.char_id = idt.char_id
+        WHERE
+            irt.serial_no = #{serialNo}
+        ORDER BY
+            ct.char_no ASC
+    </select>
+
     <select id="selectDistributionMetaByProjIdAndCharId" resultType="com.spc.spc_back.dto.spcdata.ChartDistributionSourceDto">
         SELECT
             ct.char_id as charId,

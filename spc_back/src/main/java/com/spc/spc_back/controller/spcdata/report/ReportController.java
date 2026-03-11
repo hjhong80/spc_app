@@ -16,6 +16,9 @@ import com.spc.spc_back.dto.spcdata.ChartDistributionRespDto;
 import com.spc.spc_back.dto.spcdata.ChartDetailRespDto;
 import com.spc.spc_back.dto.spcdata.ChartStatRespDto;
 import com.spc.spc_back.dto.spcdata.ProjIdAndNameRespDto;
+import com.spc.spc_back.dto.spcdata.SerialSearchCandidateRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportContextRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportDetailRespDto;
 import com.spc.spc_back.security.model.PrincipalUser;
 import com.spc.spc_back.service.spcdata.ReportService;
 
@@ -38,6 +41,29 @@ public class ReportController {
             @PathVariable Long projId,
             @AuthenticationPrincipal PrincipalUser principalUser) {
         return ResponseEntity.ok(reportService.getProjectChartStats(projId, principalUser));
+    }
+
+    @GetMapping("/serial/{serialNo}/details")
+    public ResponseEntity<ApiRespDto<List<SerialReportDetailRespDto>>> getSerialReportDetails(
+            @PathVariable String serialNo,
+            @AuthenticationPrincipal PrincipalUser principalUser) {
+        return ResponseEntity.ok(reportService.getSerialReportDetails(serialNo, principalUser));
+    }
+
+    @GetMapping("/serial/{serialNo}/context")
+    public ResponseEntity<ApiRespDto<SerialReportContextRespDto>> getSerialReportContext(
+            @PathVariable String serialNo,
+            @AuthenticationPrincipal PrincipalUser principalUser) {
+        return ResponseEntity.ok(reportService.getSerialReportContext(serialNo, principalUser));
+    }
+
+    @GetMapping("/project/{projId}/serial-search")
+    public ResponseEntity<ApiRespDto<List<SerialSearchCandidateRespDto>>> searchSerialReportCandidates(
+            @PathVariable Long projId,
+            @RequestParam String keyword,
+            @RequestParam(required = false) Integer limit,
+            @AuthenticationPrincipal PrincipalUser principalUser) {
+        return ResponseEntity.ok(reportService.searchSerialReportCandidates(projId, keyword, limit, principalUser));
     }
 
     @GetMapping("/project/{projId}/characteristic/{charId}/detail")

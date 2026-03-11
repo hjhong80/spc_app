@@ -26,6 +26,9 @@ import com.spc.spc_back.dto.spcdata.ChartDistributionSourceDto;
 import com.spc.spc_back.dto.spcdata.ChartDetailRespDto;
 import com.spc.spc_back.dto.spcdata.ChartStatRespDto;
 import com.spc.spc_back.dto.spcdata.ProjIdAndNameRespDto;
+import com.spc.spc_back.dto.spcdata.SerialSearchCandidateRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportContextRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportDetailRespDto;
 import com.spc.spc_back.entity.spcdata.Characteristic;
 import com.spc.spc_back.entity.spcdata.InspectionData;
 import com.spc.spc_back.entity.spcdata.InspectionReport;
@@ -40,6 +43,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class ReportService {
+    private static final int DEFAULT_SERIAL_SEARCH_LIMIT = 8;
+    private static final int MAX_SERIAL_SEARCH_LIMIT = 20;
     private static final String DETAIL_SCALE_MONTH = "month";
     private static final String DETAIL_SCALE_DAY = "day";
     private static final DateTimeFormatter DETAIL_MONTH_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MM-dd");
@@ -110,6 +115,80 @@ public class ReportService {
         }
 
         return new ApiRespDto<>("success", "프로젝트 차트 통계를 조회했습니다.", chartStats);
+    }
+
+    public ApiRespDto<List<SerialReportDetailRespDto>> getSerialReportDetails(
+            String serialNo,
+            PrincipalUser principalUser) {
+        if (!RoleAccessUtil.hasSpcDataAccess(principalUser)) {
+            return forbiddenResponse();
+        }
+
+        if (serialNo == null || serialNo.isBlank()) {
+            return new ApiRespDto<>("failed", "serialNo는 필수입니다.", null);
+        }
+
+        String normalizedSerialNo = serialNo.trim();
+        List<SerialReportDetailRespDto> detailRows = inspectionDataRepository
+                .selectSerialReportDetailsBySerialNo(normalizedSerialNo)
+                .orElseGet(Collections::emptyList);
+
+        if (detailRows.isEmpty()) {
+            return new ApiRespDto<>("failed", "일치하는 성적서 상세가 없습니다. serialNo=" + normalizedSerialNo, null);
+        }
+
+        return new ApiRespDto<>("success", "serialNo 기준 성적서 상세를 조회했습니다.", detailRows);
+    }
+
+    public ApiRespDto<SerialReportContextRespDto> getSerialReportContext(
+            String serialNo,
+            PrincipalUser principalUser) {
+        if (!RoleAccessUtil.hasSpcDataAccess(principalUser)) {
+            return forbiddenResponse();
+        }
+
+        if (serialNo == null || serialNo.isBlank()) {
+            return new ApiRespDto<>("failed", "serialNo는 필수입니다.", null);
+        }
+
+        String normalizedSerialNo = serialNo.trim();
+        return inspectionReportRepository.selectInspectionReportBySerialNo(normalizedSerialNo)
+                .map(report -> new ApiRespDto<>("success", "serialNo 기준 검색 컨텍스트를 조회했습니다.",
+                        SerialReportContextRespDto.builder()
+                                .projId(report.getProjId())
+                                .serialNo(report.getSerialNo())
+                                .inspDt(report.getInspDt())
+                                .build()))
+                .orElseGet(() -> new ApiRespDto<>("failed", "검색 결과가 없습니다. serialNo=" + normalizedSerialNo,
+                        null));
+    }
+
+    public ApiRespDto<List<SerialSearchCandidateRespDto>> searchSerialReportCandidates(
+            Long projId,
+            String keyword,
+            Integer limit,
+            PrincipalUser principalUser) {
+        if (!RoleAccessUtil.hasSpcDataAccess(principalUser)) {
+            return forbiddenResponse();
+        }
+
+        if (projId == null || projId <= 0L) {
+            return new ApiRespDto<>("failed", "유효한 프로젝트 ID(projId)가 필요합니다.", null);
+        }
+
+        if (projectRepository.selectProjectByProjId(projId).isEmpty()) {
+            return new ApiRespDto<>("failed", "프로젝트를 찾을 수 없습니다. projId=" + projId, null);
+        }
+
+        if (keyword == null || keyword.isBlank()) {
+            return new ApiRespDto<>("failed", "검색어(keyword)는 필수입니다.", null);
+        }
+
+        List<SerialSearchCandidateRespDto> candidates = inspectionReportRepository
+                .searchSerialReportCandidates(projId, keyword.trim(), normalizeSerialSearchLimit(limit))
+                .orElseGet(Collections::emptyList);
+
+        return new ApiRespDto<>("success", "serialNo 후보를 조회했습니다.", candidates);
     }
 
     public ApiRespDto<List<ChartDetailRespDto>> getCharacteristicChartDetail(
@@ -564,6 +643,14 @@ public class ReportService {
                 .orElse(0D);
 
         return Math.sqrt(variance);
+    }
+
+    private int normalizeSerialSearchLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_SERIAL_SEARCH_LIMIT;
+        }
+
+        return Math.min(limit, MAX_SERIAL_SEARCH_LIMIT);
     }
 
     private static final class ChartDetailSourceRow {

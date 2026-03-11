@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
 import com.spc.spc_back.dto.spcdata.ChartDetailSourceDto;
 import com.spc.spc_back.dto.spcdata.ChartDistributionSourceDto;
 import com.spc.spc_back.dto.spcdata.ChartStatRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportDetailRespDto;
 import com.spc.spc_back.entity.spcdata.InspectionData;
 
 @Mapper
@@ -20,6 +21,8 @@ public interface InspectionDataMapper {
     List<InspectionData> selectInspectionDataListByInspReportId(Long inspReportId);
 
     List<InspectionData> selectInspectionDataListByCharId(Long charId);
+
+    List<SerialReportDetailRespDto> selectSerialReportDetailsBySerialNo(@Param("serialNo") String serialNo);
 
     ChartDistributionSourceDto selectDistributionMetaByProjIdAndCharId(
             @Param("projId") Long projId,

@@ -3,7 +3,9 @@ package com.spc.spc_back.mapper;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
+import com.spc.spc_back.dto.spcdata.SerialSearchCandidateRespDto;
 import com.spc.spc_back.entity.spcdata.InspectionReport;
 
 @Mapper
@@ -13,6 +15,11 @@ public interface InspectionReportMapper {
     InspectionReport selectInspectionReportByInspReportId(Long inspReportId);
 
     InspectionReport selectInspectionReportBySerialNo(String serialNo);
+
+    List<SerialSearchCandidateRespDto> searchSerialReportCandidates(
+            @Param("projId") Long projId,
+            @Param("keyword") String keyword,
+            @Param("limit") int limit);
 
     boolean existsBySerialNo(String serialNo);
 

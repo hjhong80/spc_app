@@ -28,6 +28,9 @@ import com.spc.spc_back.dto.spcdata.ChartDetailRespDto;
 import com.spc.spc_back.dto.spcdata.ChartDistributionRespDto;
 import com.spc.spc_back.dto.spcdata.ChartStatRespDto;
 import com.spc.spc_back.dto.spcdata.ProjIdAndNameRespDto;
+import com.spc.spc_back.dto.spcdata.SerialSearchCandidateRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportContextRespDto;
+import com.spc.spc_back.dto.spcdata.SerialReportDetailRespDto;
 import com.spc.spc_back.entity.user.Role;
 import com.spc.spc_back.entity.user.UserRole;
 import com.spc.spc_back.security.model.PrincipalUser;
@@ -169,6 +172,85 @@ class ReportControllerMockMvcTest {
                 .andExpect(jsonPath("$.data").value(17));
 
         verify(reportService).getProjectReportCount(eq(1L), same(principalUser));
+    }
+
+    @Test
+    void serialNo기준성적서상세조회파라미터를전달한다() throws Exception {
+        PrincipalUser principalUser = createPrincipalUser();
+        when(reportService.getSerialReportDetails(eq("SN-1001"), same(principalUser)))
+                .thenReturn(new ApiRespDto<>("success", "ok", List.of(
+                        SerialReportDetailRespDto.builder()
+                                .charNo("C-01")
+                                .axis("X")
+                                .nominal(10.0)
+                                .uTol(0.5)
+                                .lTol(-0.5)
+                                .measuredValue(9.8)
+                                .createDt(LocalDateTime.parse("2026-03-15T08:00:00"))
+                                .updateDt(null)
+                                .build())));
+
+        mockMvc.perform(get("/spcdata/report/serial/SN-1001/details")
+                        .with(authentication(authenticationFor(principalUser))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.data[0].charNo").value("C-01"))
+                .andExpect(jsonPath("$.data[0].axis").value("X"))
+                .andExpect(jsonPath("$.data[0].nominal").value(10.0))
+                .andExpect(jsonPath("$.data[0].measuredValue").value(9.8))
+                .andExpect(jsonPath("$.data[0].createDt").value("2026-03-15T08:00:00"))
+                .andExpect(jsonPath("$.data[0].updateDt").isEmpty());
+
+        verify(reportService).getSerialReportDetails(eq("SN-1001"), same(principalUser));
+    }
+
+    @Test
+    void serialNo기준검색컨텍스트조회파라미터를전달한다() throws Exception {
+        PrincipalUser principalUser = createPrincipalUser();
+        when(reportService.getSerialReportContext(eq("SN-1001"), same(principalUser)))
+                .thenReturn(new ApiRespDto<>("success", "ok",
+                        SerialReportContextRespDto.builder()
+                                .projId(1L)
+                                .serialNo("SN-1001")
+                                .inspDt(LocalDateTime.parse("2026-03-15T08:00:00"))
+                                .build()));
+
+        mockMvc.perform(get("/spcdata/report/serial/SN-1001/context")
+                        .with(authentication(authenticationFor(principalUser))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.data.projId").value(1))
+                .andExpect(jsonPath("$.data.serialNo").value("SN-1001"))
+                .andExpect(jsonPath("$.data.inspDt").value("2026-03-15T08:00:00"));
+
+        verify(reportService).getSerialReportContext(eq("SN-1001"), same(principalUser));
+    }
+
+    @Test
+    void 프로젝트범위serial후보검색파라미터를전달한다() throws Exception {
+        PrincipalUser principalUser = createPrincipalUser();
+        when(reportService.searchSerialReportCandidates(eq(1L), eq("SN-10"), eq(8), same(principalUser)))
+                .thenReturn(new ApiRespDto<>("success", "ok", List.of(
+                        SerialSearchCandidateRespDto.builder()
+                                .serialNo("SN-1001")
+                                .inspDt(LocalDateTime.parse("2026-03-15T08:00:00"))
+                                .build(),
+                        SerialSearchCandidateRespDto.builder()
+                                .serialNo("SN-1002")
+                                .inspDt(LocalDateTime.parse("2026-03-15T10:00:00"))
+                                .build())));
+
+        mockMvc.perform(get("/spcdata/report/project/1/serial-search")
+                        .queryParam("keyword", "SN-10")
+                        .queryParam("limit", "8")
+                        .with(authentication(authenticationFor(principalUser))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.data[0].serialNo").value("SN-1001"))
+                .andExpect(jsonPath("$.data[0].inspDt").value("2026-03-15T08:00:00"))
+                .andExpect(jsonPath("$.data[1].serialNo").value("SN-1002"));
+
+        verify(reportService).searchSerialReportCandidates(eq(1L), eq("SN-10"), eq(8), same(principalUser));
     }
 
     private Authentication authenticationFor(PrincipalUser principalUser) {

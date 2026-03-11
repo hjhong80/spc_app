@@ -1,0 +1,69 @@
+<h2>시리얼 검색 분리안</h2>
+<p class="subtitle">차트는 serialNo 전달만 하고, 성적서 상세 모달은 차트 상태와 독립적으로 여는 구조입니다.</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">검색 모달</div>
+    <div class="mockup-body" style="padding: 24px; background:#4d5057; min-height:420px;">
+      <div style="font-size: 28px; font-weight: 700; color:#f5f7fb; margin-bottom:24px;">시리얼 검색</div>
+      <div style="position:relative; margin-bottom:18px;">
+        <div style="position:absolute; left:14px; top:-11px; font-size:12px; color:#9bd0ff; background:#4d5057; padding:0 8px;">serialNo</div>
+        <div style="display:flex; align-items:center; gap:12px; border:2px solid #8ec8ff; border-radius:12px; padding:18px 16px; background:#50545d;">
+          <div style="flex:1; font-size:30px; color:#f5f7fb;">em</div>
+          <button class="mock-button" style="margin:0; min-width:52px; height:52px; border-radius:10px; font-size:24px;">⌕</button>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="padding:14px 16px; border:1px solid rgba(255,255,255,0.1); border-radius:12px; background:#1d2330;">
+          <div style="font-weight:700;">EM293568</div>
+          <div class="subtitle" style="margin:6px 0 0;">2025-08-29 04:55:39</div>
+        </div>
+        <div style="padding:14px 16px; border:1px solid rgba(255,255,255,0.1); border-radius:12px; background:#1d2330; opacity:0.75;">
+          <div style="font-weight:700;">EM293569</div>
+          <div class="subtitle" style="margin:6px 0 0;">2025-08-29 04:58:10</div>
+        </div>
+      </div>
+      <div style="margin-top:18px; color:#b8c2d6; font-size:13px;">닫기 버튼 없음. 모달 바깥 클릭으로 닫힘.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">메인 차트</div>
+      <div class="mockup-body" style="padding:20px;">
+        <div class="label">변경 후</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <div style="font-size:20px; font-weight:700;">Cpk 메인 차트</div>
+          <button class="mock-button">시리얼 검색</button>
+        </div>
+        <div class="placeholder" style="margin-top:18px; min-height:180px;">특성치 선택 없이 검색 모달 오픈</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">세부 일 차트</div>
+      <div class="mockup-body" style="padding:20px;">
+        <div class="label">변경 후</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <div style="font-size:20px; font-weight:700;">세부 일 차트</div>
+          <button class="mock-button">시리얼 검색</button>
+        </div>
+        <div class="placeholder" style="margin-top:18px; min-height:180px;">점 클릭 시 해당 점의 serialNo만 넘겨서 같은 성적서 모달 오픈</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>동작 흐름</h3>
+  <div class="options">
+    <div class="option" data-choice="flow-confirm" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>이 흐름으로 진행</h3>
+        <p>검색 모달은 독립, 메인 차트는 특성치 선택 없이 검색 가능, 세부 일 차트 점 클릭은 serialNo 전달만 담당</p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -113,6 +113,25 @@
             idt.insp_data_id
     </select>
 
+    <select id="searchSerialReportCandidates"
+        resultType="com.spc.spc_back.dto.spcdata.SerialSearchCandidateRespDto">
+        SELECT
+            irt.serial_no as serialNo,
+            irt.insp_dt as inspDt
+        FROM
+            insp_report_tb irt
+        WHERE
+            irt.proj_id = #{projId}
+            AND irt.serial_no LIKE CONCAT(#{keyword}, '%')
+        ORDER BY
+            CASE
+                WHEN irt.serial_no = #{keyword} THEN 0
+                ELSE 1
+            END,
+            irt.serial_no ASC
+        LIMIT #{limit}
+    </select>
+
     <select id="existsBySerialNo" resultType="boolean">
         SELECT EXISTS(
             SELECT

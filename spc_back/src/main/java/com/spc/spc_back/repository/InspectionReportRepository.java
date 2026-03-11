@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
 
+import com.spc.spc_back.dto.spcdata.SerialSearchCandidateRespDto;
 import com.spc.spc_back.entity.spcdata.InspectionReport;
 import com.spc.spc_back.mapper.InspectionReportMapper;
 
@@ -25,6 +26,10 @@ public class InspectionReportRepository {
 
     public Optional<InspectionReport> selectInspectionReportBySerialNo(String serialNo) {
         return Optional.ofNullable(inspectionReportMapper.selectInspectionReportBySerialNo(serialNo));
+    }
+
+    public Optional<List<SerialSearchCandidateRespDto>> searchSerialReportCandidates(Long projId, String keyword, int limit) {
+        return Optional.ofNullable(inspectionReportMapper.searchSerialReportCandidates(projId, keyword, limit));
     }
 
     public boolean existsBySerialNo(String serialNo) {

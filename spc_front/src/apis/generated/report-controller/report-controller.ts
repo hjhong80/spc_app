@@ -22,9 +22,13 @@ import type {
     ApiRespDtoListChartDetailRespDto,
     ApiRespDtoListChartStatRespDto,
     ApiRespDtoListProjIdAndNameRespDto,
+    ApiRespDtoListSerialReportDetailRespDto,
+    ApiRespDtoListSerialSearchCandidateRespDto,
     ApiRespDtoLong,
+    ApiRespDtoSerialReportContextRespDto,
     GetCharacteristicChartDetailParams,
     GetCharacteristicDistributionParams,
+    SearchSerialReportCandidatesParams,
 } from '../model';
 
 import { customInstance } from '../../custom-instance';
@@ -35,6 +39,370 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export type getSerialReportDetailsResponse200 = {
+    data: ApiRespDtoListSerialReportDetailRespDto;
+    status: 200;
+};
+
+export type getSerialReportDetailsResponseSuccess =
+    getSerialReportDetailsResponse200 & {
+        headers: Headers;
+    };
+export type getSerialReportDetailsResponse =
+    getSerialReportDetailsResponseSuccess;
+
+export const getGetSerialReportDetailsUrl = (serialNo: string) => {
+    return `/spcdata/report/serial/${serialNo}/details`;
+};
+
+export const getSerialReportDetails = async (
+    serialNo: string,
+    options?: RequestInit,
+): Promise<getSerialReportDetailsResponse> => {
+    return customInstance<getSerialReportDetailsResponse>(
+        getGetSerialReportDetailsUrl(serialNo),
+        {
+            ...options,
+            method: 'GET',
+        },
+    );
+};
+
+export const getGetSerialReportDetailsQueryKey = (serialNo: string) => {
+    return [`/spcdata/report/serial/${serialNo}/details`] as const;
+};
+
+export const getGetSerialReportDetailsQueryOptions = <
+    TData = Awaited<ReturnType<typeof getSerialReportDetails>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportDetails>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+        queryOptions?.queryKey ?? getGetSerialReportDetailsQueryKey(serialNo);
+
+    const queryFn: QueryFunction<
+        Awaited<ReturnType<typeof getSerialReportDetails>>
+    > = ({ signal }) =>
+        getSerialReportDetails(serialNo, { signal, ...requestOptions });
+
+    return {
+        queryKey,
+        queryFn,
+        enabled: !!serialNo,
+        ...queryOptions,
+    } as UseQueryOptions<
+        Awaited<ReturnType<typeof getSerialReportDetails>>,
+        TError,
+        TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type GetSerialReportDetailsQueryResult = NonNullable<
+    Awaited<ReturnType<typeof getSerialReportDetails>>
+>;
+export type GetSerialReportDetailsQueryError = ErrorType<unknown>;
+
+export function useGetSerialReportDetails<
+    TData = Awaited<ReturnType<typeof getSerialReportDetails>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options: {
+        query: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportDetails>>,
+                TError,
+                TData
+            >
+        > &
+            Pick<
+                DefinedInitialDataOptions<
+                    Awaited<ReturnType<typeof getSerialReportDetails>>,
+                    TError,
+                    Awaited<ReturnType<typeof getSerialReportDetails>>
+                >,
+                'initialData'
+            >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGetSerialReportDetails<
+    TData = Awaited<ReturnType<typeof getSerialReportDetails>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportDetails>>,
+                TError,
+                TData
+            >
+        > &
+            Pick<
+                UndefinedInitialDataOptions<
+                    Awaited<ReturnType<typeof getSerialReportDetails>>,
+                    TError,
+                    Awaited<ReturnType<typeof getSerialReportDetails>>
+                >,
+                'initialData'
+            >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGetSerialReportDetails<
+    TData = Awaited<ReturnType<typeof getSerialReportDetails>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportDetails>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useGetSerialReportDetails<
+    TData = Awaited<ReturnType<typeof getSerialReportDetails>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportDetails>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+} {
+    const queryOptions = getGetSerialReportDetailsQueryOptions(
+        serialNo,
+        options,
+    );
+
+    const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+        TData,
+        TError
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+    return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export type getSerialReportContextResponse200 = {
+    data: ApiRespDtoSerialReportContextRespDto;
+    status: 200;
+};
+
+export type getSerialReportContextResponseSuccess =
+    getSerialReportContextResponse200 & {
+        headers: Headers;
+    };
+export type getSerialReportContextResponse =
+    getSerialReportContextResponseSuccess;
+
+export const getGetSerialReportContextUrl = (serialNo: string) => {
+    return `/spcdata/report/serial/${serialNo}/context`;
+};
+
+export const getSerialReportContext = async (
+    serialNo: string,
+    options?: RequestInit,
+): Promise<getSerialReportContextResponse> => {
+    return customInstance<getSerialReportContextResponse>(
+        getGetSerialReportContextUrl(serialNo),
+        {
+            ...options,
+            method: 'GET',
+        },
+    );
+};
+
+export const getGetSerialReportContextQueryKey = (serialNo: string) => {
+    return [`/spcdata/report/serial/${serialNo}/context`] as const;
+};
+
+export const getGetSerialReportContextQueryOptions = <
+    TData = Awaited<ReturnType<typeof getSerialReportContext>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportContext>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+        queryOptions?.queryKey ?? getGetSerialReportContextQueryKey(serialNo);
+
+    const queryFn: QueryFunction<
+        Awaited<ReturnType<typeof getSerialReportContext>>
+    > = ({ signal }) =>
+        getSerialReportContext(serialNo, { signal, ...requestOptions });
+
+    return {
+        queryKey,
+        queryFn,
+        enabled: !!serialNo,
+        ...queryOptions,
+    } as UseQueryOptions<
+        Awaited<ReturnType<typeof getSerialReportContext>>,
+        TError,
+        TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type GetSerialReportContextQueryResult = NonNullable<
+    Awaited<ReturnType<typeof getSerialReportContext>>
+>;
+export type GetSerialReportContextQueryError = ErrorType<unknown>;
+
+export function useGetSerialReportContext<
+    TData = Awaited<ReturnType<typeof getSerialReportContext>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options: {
+        query: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportContext>>,
+                TError,
+                TData
+            >
+        > &
+            Pick<
+                DefinedInitialDataOptions<
+                    Awaited<ReturnType<typeof getSerialReportContext>>,
+                    TError,
+                    Awaited<ReturnType<typeof getSerialReportContext>>
+                >,
+                'initialData'
+            >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGetSerialReportContext<
+    TData = Awaited<ReturnType<typeof getSerialReportContext>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportContext>>,
+                TError,
+                TData
+            >
+        > &
+            Pick<
+                UndefinedInitialDataOptions<
+                    Awaited<ReturnType<typeof getSerialReportContext>>,
+                    TError,
+                    Awaited<ReturnType<typeof getSerialReportContext>>
+                >,
+                'initialData'
+            >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGetSerialReportContext<
+    TData = Awaited<ReturnType<typeof getSerialReportContext>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportContext>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useGetSerialReportContext<
+    TData = Awaited<ReturnType<typeof getSerialReportContext>>,
+    TError = ErrorType<unknown>,
+>(
+    serialNo: string,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof getSerialReportContext>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+} {
+    const queryOptions = getGetSerialReportContextQueryOptions(
+        serialNo,
+        options,
+    );
+
+    const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+        TData,
+        TError
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+    return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export type getRecentlyProjectListResponse200 = {
     data: ApiRespDtoListProjIdAndNameRespDto;
@@ -192,6 +560,223 @@ export function useGetRecentlyProjectList<
     queryKey: DataTag<QueryKey, TData, TError>;
 } {
     const queryOptions = getGetRecentlyProjectListQueryOptions(options);
+
+    const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+        TData,
+        TError
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+    return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export type searchSerialReportCandidatesResponse200 = {
+    data: ApiRespDtoListSerialSearchCandidateRespDto;
+    status: 200;
+};
+
+export type searchSerialReportCandidatesResponseSuccess =
+    searchSerialReportCandidatesResponse200 & {
+        headers: Headers;
+    };
+export type searchSerialReportCandidatesResponse =
+    searchSerialReportCandidatesResponseSuccess;
+
+export const getSearchSerialReportCandidatesUrl = (
+    projId: number,
+    params: SearchSerialReportCandidatesParams,
+) => {
+    const normalizedParams = new URLSearchParams();
+
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined) {
+            normalizedParams.append(
+                key,
+                value === null ? 'null' : value.toString(),
+            );
+        }
+    });
+
+    const stringifiedParams = normalizedParams.toString();
+
+    return stringifiedParams.length > 0
+        ? `/spcdata/report/project/${projId}/serial-search?${stringifiedParams}`
+        : `/spcdata/report/project/${projId}/serial-search`;
+};
+
+export const searchSerialReportCandidates = async (
+    projId: number,
+    params: SearchSerialReportCandidatesParams,
+    options?: RequestInit,
+): Promise<searchSerialReportCandidatesResponse> => {
+    return customInstance<searchSerialReportCandidatesResponse>(
+        getSearchSerialReportCandidatesUrl(projId, params),
+        {
+            ...options,
+            method: 'GET',
+        },
+    );
+};
+
+export const getSearchSerialReportCandidatesQueryKey = (
+    projId: number,
+    params?: SearchSerialReportCandidatesParams,
+) => {
+    return [
+        `/spcdata/report/project/${projId}/serial-search`,
+        ...(params ? [params] : []),
+    ] as const;
+};
+
+export const getSearchSerialReportCandidatesQueryOptions = <
+    TData = Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+    TError = ErrorType<unknown>,
+>(
+    projId: number,
+    params: SearchSerialReportCandidatesParams,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+        queryOptions?.queryKey ??
+        getSearchSerialReportCandidatesQueryKey(projId, params);
+
+    const queryFn: QueryFunction<
+        Awaited<ReturnType<typeof searchSerialReportCandidates>>
+    > = ({ signal }) =>
+        searchSerialReportCandidates(projId, params, {
+            signal,
+            ...requestOptions,
+        });
+
+    return {
+        queryKey,
+        queryFn,
+        enabled: !!projId,
+        ...queryOptions,
+    } as UseQueryOptions<
+        Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+        TError,
+        TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SearchSerialReportCandidatesQueryResult = NonNullable<
+    Awaited<ReturnType<typeof searchSerialReportCandidates>>
+>;
+export type SearchSerialReportCandidatesQueryError = ErrorType<unknown>;
+
+export function useSearchSerialReportCandidates<
+    TData = Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+    TError = ErrorType<unknown>,
+>(
+    projId: number,
+    params: SearchSerialReportCandidatesParams,
+    options: {
+        query: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+                TError,
+                TData
+            >
+        > &
+            Pick<
+                DefinedInitialDataOptions<
+                    Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+                    TError,
+                    Awaited<ReturnType<typeof searchSerialReportCandidates>>
+                >,
+                'initialData'
+            >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchSerialReportCandidates<
+    TData = Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+    TError = ErrorType<unknown>,
+>(
+    projId: number,
+    params: SearchSerialReportCandidatesParams,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+                TError,
+                TData
+            >
+        > &
+            Pick<
+                UndefinedInitialDataOptions<
+                    Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+                    TError,
+                    Awaited<ReturnType<typeof searchSerialReportCandidates>>
+                >,
+                'initialData'
+            >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSearchSerialReportCandidates<
+    TData = Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+    TError = ErrorType<unknown>,
+>(
+    projId: number,
+    params: SearchSerialReportCandidatesParams,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+};
+
+export function useSearchSerialReportCandidates<
+    TData = Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+    TError = ErrorType<unknown>,
+>(
+    projId: number,
+    params: SearchSerialReportCandidatesParams,
+    options?: {
+        query?: Partial<
+            UseQueryOptions<
+                Awaited<ReturnType<typeof searchSerialReportCandidates>>,
+                TError,
+                TData
+            >
+        >;
+        request?: SecondParameter<typeof customInstance>;
+    },
+    queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+} {
+    const queryOptions = getSearchSerialReportCandidatesQueryOptions(
+        projId,
+        params,
+        options,
+    );
 
     const query = useQuery(queryOptions, queryClient) as UseQueryResult<
         TData,
