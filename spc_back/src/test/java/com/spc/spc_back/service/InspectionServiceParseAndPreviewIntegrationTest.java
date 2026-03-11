@@ -12,6 +12,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.env.Environment;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -25,7 +26,10 @@ import com.spc.spc_back.entity.spcdata.InspectionReport;
 import com.spc.spc_back.repository.InspectionDataRepository;
 import com.spc.spc_back.repository.InspectionReportRepository;
 
+import lombok.extern.slf4j.Slf4j;
+
 @SpringBootTest
+@Slf4j
 @Testcontainers(disabledWithoutDocker = true)
 @Sql(scripts = {
         "classpath:schema.sql",
@@ -53,6 +57,9 @@ class InspectionServiceParseAndPreviewIntegrationTest {
 
     @Autowired
     private InspectionDataRepository inspectionDataRepository;
+
+    @Autowired
+    private Environment environment;
 
     @Test
     void parseAndPreview는파싱후공통저장경로로리포트와측정데이터를저장한다() throws IOException {
@@ -109,13 +116,46 @@ class InspectionServiceParseAndPreviewIntegrationTest {
         assertThat(response.getParsedRowCount()).isEqualTo(950);
         assertThat(response.getInsertedRowCount()).isEqualTo(950);
         assertThat(response.getSkippedRowCount()).isEqualTo(0);
-        assertThat(response.getParsedRows()).hasSizeLessThanOrEqualTo(20);
+        assertThat(response.getParsedRows()).hasSizeLessThanOrEqualTo(12);
 
         InspectionReport savedReport = inspectionReportRepository.selectInspectionReportBySerialNo("LOT-BULK-950")
                 .orElseThrow();
         assertThat(inspectionDataRepository.selectInspectionDataListByInspReportId(savedReport.getInspReportId())
                 .orElseThrow())
                 .hasSize(950);
+    }
+
+    @Test
+    void parseAndPreview는900건업로드를로컬기준으로재계측한다() throws IOException {
+        MockMultipartFile file = createExcelFile(LocalDateTime.of(2026, 5, 5, 14, 30), 900, 20.0);
+        long startedAtNanos = System.nanoTime();
+
+        ExcelParsePreviewRespDto response = inspectionService.parseAndPreview(file, "LOT-BULK-900", 1L);
+
+        long elapsedMillis = (System.nanoTime() - startedAtNanos) / 1_000_000L;
+
+        assertThat(response.getSkippedDuplicateSerialNo()).isFalse();
+        assertThat(response.getParsedRowCount()).isEqualTo(900);
+        assertThat(response.getInsertedRowCount()).isEqualTo(900);
+        assertThat(response.getSkippedRowCount()).isEqualTo(0);
+        assertThat(response.getParsedRows()).hasSizeLessThanOrEqualTo(12);
+        assertThat(environment.getProperty("spc.upload.preview-row-limit")).isEqualTo("12");
+        assertThat(environment.getProperty("spc.upload.streaming-batch-size")).isEqualTo("300");
+
+        InspectionReport savedReport = inspectionReportRepository.selectInspectionReportBySerialNo("LOT-BULK-900")
+                .orElseThrow();
+        assertThat(inspectionDataRepository.selectInspectionDataListByInspReportId(savedReport.getInspReportId())
+                .orElseThrow())
+                .hasSize(900);
+
+        log.info(
+                "[UploadRemeasure] local 900-row upload elapsedMs={}, parsedRows={}, insertedRows={}, previewRows={}, previewRowLimit={}, batchFlushSize={}",
+                elapsedMillis,
+                response.getParsedRowCount(),
+                response.getInsertedRowCount(),
+                response.getParsedRows().size(),
+                environment.getProperty("spc.upload.preview-row-limit"),
+                environment.getProperty("spc.upload.streaming-batch-size"));
     }
 
     private MockMultipartFile createExcelFile(LocalDateTime inspDt, double measuredValue) throws IOException {

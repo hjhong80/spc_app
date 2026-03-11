@@ -28,6 +28,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -54,8 +55,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 public class InspectionServiceImpl implements InspectionService {
-    private static final int LOG_PREVIEW_ROW_LIMIT = 20;
-    private static final int STREAMING_BATCH_SIZE = 500;
     private static final DateTimeFormatter DATETIME_OUTPUT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_OUTPUT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_OUTPUT_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -102,6 +101,10 @@ public class InspectionServiceImpl implements InspectionService {
     private final CharacteristicRepository characteristicRepository;
     private final InspectionReportRepository inspectionReportRepository;
     private final InspectionDataRepository inspectionDataRepository;
+    @Value("${spc.upload.preview-row-limit:12}")
+    private int previewRowLimit;
+    @Value("${spc.upload.streaming-batch-size:300}")
+    private int streamingBatchSize;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StreamingInspectionRowReader streamingInspectionRowReader = new StreamingInspectionRowReader();
 
@@ -139,6 +142,7 @@ public class InspectionServiceImpl implements InspectionService {
     @Override
     @Transactional
     public ExcelParsePreviewRespDto parseAndPreview(MultipartFile file, String lotNo, Long projId) throws IOException {
+        long startedAtNanos = System.nanoTime();
         if (projId == null || projId <= 0L) {
             throw new IllegalArgumentException("유효한 프로젝트 ID(projId)가 필요합니다.");
         }
@@ -195,8 +199,10 @@ public class InspectionServiceImpl implements InspectionService {
 
             CharacteristicLookup lookup = loadCharacteristicLookup(project.getProjId());
             InspectionReport inspectionReport = insertInspectionReport(project.getProjId(), serialNo, inspDt);
-            StreamingUploadAccumulator accumulator = new StreamingUploadAccumulator(LOG_PREVIEW_ROW_LIMIT);
-            List<InspectionBatchRowReqDto> batchRows = new ArrayList<>(STREAMING_BATCH_SIZE);
+            int normalizedPreviewRowLimit = getNormalizedPreviewRowLimit();
+            int normalizedStreamingBatchSize = getNormalizedStreamingBatchSize();
+            StreamingUploadAccumulator accumulator = new StreamingUploadAccumulator(normalizedPreviewRowLimit);
+            List<InspectionBatchRowReqDto> batchRows = new ArrayList<>(normalizedStreamingBatchSize);
 
             streamingInspectionRowReader.read(
                     file.getInputStream(),
@@ -211,7 +217,7 @@ public class InspectionServiceImpl implements InspectionService {
                         accumulator.recordParsedRow(parsedRow);
                         batchRows.add(toBatchRow(parsedRow));
 
-                        if (batchRows.size() >= STREAMING_BATCH_SIZE) {
+                        if (batchRows.size() >= normalizedStreamingBatchSize) {
                             flushParsedRows(inspectionReport.getInspReportId(), batchRows, lookup, accumulator);
                         }
                     });
@@ -227,12 +233,14 @@ public class InspectionServiceImpl implements InspectionService {
             }
 
             log.info(
-                    "[ExcelParseSave] projId={}, projNum={}, reqLotNo={}, fileName={}, parsedRows={}",
+                    "[ExcelParseSave] projId={}, projNum={}, reqLotNo={}, fileName={}, parsedRows={}, previewRowLimit={}, batchFlushSize={}",
                     project.getProjId(),
                     project.getProjNum(),
                     lotNo,
                     fileName,
-                    accumulator.getParsedRowCount());
+                    accumulator.getParsedRowCount(),
+                    normalizedPreviewRowLimit,
+                    normalizedStreamingBatchSize);
             log.info(
                     "[ExcelParseSave] config dataStartRow={}, charNoCol={}, axisCol={}, nominalCol={}, uTolCol={}, lTolCol={}, measuredValueCol={}, serialNo={}, inspDt={}",
                     dataStartRow,
@@ -246,7 +254,7 @@ public class InspectionServiceImpl implements InspectionService {
                     formatDateTime(inspDt));
 
             List<ExcelParsePreviewRespDto.ParsedRow> previewRows = accumulator.getPreviewRows();
-            int logLimit = Math.min(previewRows.size(), LOG_PREVIEW_ROW_LIMIT);
+            int logLimit = Math.min(previewRows.size(), normalizedPreviewRowLimit);
             for (int i = 0; i < logLimit; i += 1) {
                 ExcelParsePreviewRespDto.ParsedRow row = previewRows.get(i);
                 log.debug(
@@ -260,6 +268,16 @@ public class InspectionServiceImpl implements InspectionService {
                         row.getLTol(),
                         row.getMeasuredValue());
             }
+
+            long elapsedMillis = (System.nanoTime() - startedAtNanos) / 1_000_000L;
+            log.info(
+                    "[ExcelParseSave] completed projId={}, serialNo={}, elapsedMs={}, parsedRows={}, insertedRows={}, skippedRows={}",
+                    project.getProjId(),
+                    serialNo,
+                    elapsedMillis,
+                    accumulator.getParsedRowCount(),
+                    accumulator.getInsertedRowCount(),
+                    accumulator.getSkippedRowCount());
 
             return ExcelParsePreviewRespDto.builder()
                     .projId(project.getProjId())
@@ -372,6 +390,14 @@ public class InspectionServiceImpl implements InspectionService {
             throw new RuntimeException("검사 리포트 저장에 실패했습니다.");
         }
         return inspectionReport;
+    }
+
+    private int getNormalizedPreviewRowLimit() {
+        return Math.max(previewRowLimit, 0);
+    }
+
+    private int getNormalizedStreamingBatchSize() {
+        return Math.max(streamingBatchSize, 1);
     }
 
     private CharacteristicLookup loadCharacteristicLookup(Long projId) {
